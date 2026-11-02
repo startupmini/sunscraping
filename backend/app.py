@@ -396,10 +396,10 @@ def update_audit_settings(audit_id):
     name = data.get('name')
     repeat_days = data.get('repeat_days')
     if repeat_days is not None:
-        try:
-            repeat_days = max(0, min(365, int(repeat_days)))
-        except (TypeError, ValueError):
+        clamped = database.parse_repeat_days(repeat_days)
+        if clamped is None:
             return jsonify({"error": "repeat_days harus angka 0-365."}), 400
+        repeat_days = clamped
     audit = database.update_audit(audit_id, name=name, repeat_days=repeat_days)
     if not audit:
         return jsonify({"error": "Audit tidak ditemukan."}), 404
@@ -421,8 +421,7 @@ def target_history():
     target_id = _parse_int_arg(request.args.get('target_id'))
     if not target_id:
         return jsonify({"error": "target_id wajib diisi."}), 400
-    limit = _parse_int_arg(request.args.get('limit')) or 50
-    limit = max(1, min(200, limit))
+    limit = database.clamp_limit(_parse_int_arg(request.args.get('limit')), 1, 200, 50)
     target = database.get_target_with_audit(target_id)
     if not target:
         return jsonify({"error": "Target tidak ditemukan."}), 404
@@ -433,11 +432,9 @@ def target_history():
 
 
 @app.route('/api/events', methods=['GET'])
+@require_api_key
 def dashboard_events():
-    """Server-Sent Events feed for the dashboard (session cookie auth)."""
-    if not (session.get('dashboard') or _has_valid_api_key()):
-        return jsonify({"error": "Unauthorized"}), 401
-
+    """Server-Sent Events feed for the dashboard."""
     audit_id = _parse_int_arg(request.args.get('audit_id'))
 
     def generate():
@@ -472,6 +469,82 @@ def dashboard_events():
         },
     )
 
+def _parse_upload_rows(df):
+    """Read a target sheet into task dicts plus the counts the response reports.
+
+    Returns None when the file has no Link/URL column.
+    """
+    truncated = len(df) > MAX_ROWS
+    if truncated:
+        df = df.head(MAX_ROWS)
+
+    url_column = _pick_column(df.columns, URL_HEADER_HINTS)
+    if url_column is None:
+        return None
+
+    username_column = _pick_column(df.columns, USER_HEADER_HINTS, USER_HEADER_EXCLUDE)
+    tema_column = _pick_column(df.columns, TEMA_HEADER_HINTS)
+
+    tasks = []
+    empty_rows = 0
+    invalid_urls = 0
+
+    for _, row in df.iterrows():
+        raw_url = _cell_text(row.get(url_column))
+        if not raw_url:
+            empty_rows += 1
+            continue
+
+        target = normalize_target_url(raw_url)
+        if not target:
+            invalid_urls += 1
+            continue
+
+        platform, url = target
+        username = _cell_text(row.get(username_column)) if username_column else None
+        if username:
+            username = username.lstrip('@').strip() or None
+        tema = _cell_text(row.get(tema_column)) if tema_column else None
+
+        tasks.append({
+            'url': url,
+            'platform': platform,
+            'username': username,
+            'tema': tema
+        })
+
+    return {
+        'tasks': tasks,
+        'empty_rows': empty_rows,
+        'invalid_urls': invalid_urls,
+        'truncated': truncated,
+        'columns': {
+            "url": str(url_column),
+            "username": str(username_column) if username_column is not None else None,
+            "tema": str(tema_column) if tema_column is not None else None,
+        },
+    }
+
+
+def _upload_summary(parsed, result, audit_name, repeat_days, is_append):
+    """Response body shared by the create-audit and append-to-audit paths."""
+    return {
+        "inserted": result['inserted'],
+        "duplicates": result['duplicates'],
+        "skipped": parsed['empty_rows'] + parsed['invalid_urls'],
+        "invalid_urls": parsed['invalid_urls'],
+        "empty_rows": parsed['empty_rows'],
+        "truncated": parsed['truncated'],
+        "max_rows": MAX_ROWS,
+        "append": is_append,
+        "audit_id": result['audit_id'],
+        "audit_name": audit_name,
+        "run_id": result['run_id'],
+        "repeat_days": repeat_days,
+        "columns": parsed['columns'],
+    }
+
+
 @app.route('/api/upload', methods=['POST'])
 @require_api_key
 def upload_file():
@@ -500,60 +573,22 @@ def upload_file():
         if len(df.columns) == 0:
             return jsonify({"error": "File tidak berisi kolom yang bisa dibaca."}), 400
 
-        truncated = len(df) > MAX_ROWS
-        if truncated:
-            df = df.head(MAX_ROWS)
-
-        url_column = _pick_column(df.columns, URL_HEADER_HINTS)
-        if url_column is None:
+        parsed = _parse_upload_rows(df)
+        if parsed is None:
             return jsonify({
                 "error": "Kolom 'Link'/'URL' tidak ditemukan. Periksa header file (contoh: Link, URL, Tautan)."
             }), 400
 
-        username_column = _pick_column(df.columns, USER_HEADER_HINTS, USER_HEADER_EXCLUDE)
-        tema_column = _pick_column(df.columns, TEMA_HEADER_HINTS)
-
-        tasks = []
-        empty_rows = 0
-        invalid_urls = 0
-
-        for _, row in df.iterrows():
-            raw_url = _cell_text(row.get(url_column))
-            if not raw_url:
-                empty_rows += 1
-                continue
-
-            target = normalize_target_url(raw_url)
-            if not target:
-                invalid_urls += 1
-                continue
-
-            platform, url = target
-            username = _cell_text(row.get(username_column)) if username_column else None
-            if username:
-                username = username.lstrip('@').strip() or None
-            tema = _cell_text(row.get(tema_column)) if tema_column else None
-
-            tasks.append({
-                'url': url,
-                'platform': platform,
-                'username': username,
-                'tema': tema
-            })
+        tasks = parsed['tasks']
+        empty_rows = parsed['empty_rows']
+        invalid_urls = parsed['invalid_urls']
 
         audit_name = (request.form.get('audit_name') or '').strip()
         if not audit_name:
             audit_name = os.path.splitext(safe_name)[0].replace('_', ' ').strip() or 'Audit baru'
-        try:
-            repeat_days = max(0, min(365, int(request.form.get('repeat_days') or 0)))
-        except (TypeError, ValueError):
-            repeat_days = 0
+        clamped = database.parse_repeat_days(request.form.get('repeat_days'))
+        repeat_days = 0 if clamped is None else clamped
 
-        columns_summary = {
-            "url": str(url_column),
-            "username": str(username_column) if username_column is not None else None,
-            "tema": str(tema_column) if tema_column is not None else None,
-        }
         append_audit_id = _parse_int_arg(request.form.get('audit_id'))
 
         if append_audit_id:
@@ -568,37 +603,20 @@ def upload_file():
             if result is None:
                 return jsonify({"error": "Audit yang dipilih tidak ditemukan."}), 404
 
-            inserted = result['inserted']
-            duplicates = result['duplicates']
-            summary = {
-                "inserted": inserted,
-                "duplicates": duplicates,
-                "skipped": empty_rows + invalid_urls,
-                "invalid_urls": invalid_urls,
-                "empty_rows": empty_rows,
-                "truncated": truncated,
-                "max_rows": MAX_ROWS,
-                "append": True,
-                "audit_id": result['audit_id'],
-                "audit_name": result['audit_name'],
-                "run_id": result['run_id'],
-                "repeat_days": None,
-                "columns": columns_summary,
-            }
-
-            if inserted == 0:
+            summary = _upload_summary(parsed, result, result['audit_name'], None, True)
+            if summary['inserted'] == 0:
                 logger.warning(f"Append rejected, no new rows in {safe_name} for audit {append_audit_id}")
                 reason = (
-                    f"Semua {duplicates} link sudah ada di audit ini."
-                    if duplicates else
+                    f"Semua {summary['duplicates']} link sudah ada di audit ini."
+                    if summary['duplicates'] else
                     f"Tidak ada target valid. {empty_rows} baris kosong, "
                     f"{invalid_urls} link bukan Instagram/TikTok."
                 )
                 return jsonify({"error": reason, **summary}), 400
 
             logger.info(
-                f"Appended {inserted} targets to audit '{result['audit_name']}' "
-                f"({duplicates} duplicates, {empty_rows} empty, {invalid_urls} invalid) "
+                f"Appended {summary['inserted']} targets to audit '{result['audit_name']}' "
+                f"({summary['duplicates']} duplicates, {empty_rows} empty, {invalid_urls} invalid) "
                 f"from {safe_name}"
             )
             return jsonify({"success": True, **summary})
@@ -609,39 +627,23 @@ def upload_file():
             repeat_days=repeat_days,
             source_filename=safe_name,
         )
-        inserted = result['inserted']
-        duplicates = result['duplicates']
-        summary = {
-            "inserted": inserted,
-            "duplicates": duplicates,
-            "skipped": empty_rows + invalid_urls,
-            "invalid_urls": invalid_urls,
-            "empty_rows": empty_rows,
-            "truncated": truncated,
-            "max_rows": MAX_ROWS,
-            "append": False,
-            "audit_id": result['audit_id'],
-            "audit_name": audit_name,
-            "run_id": result['run_id'],
-            "repeat_days": repeat_days,
-            "columns": columns_summary,
-        }
+        summary = _upload_summary(parsed, result, audit_name, repeat_days, False)
 
-        if inserted == 0:
+        if summary['inserted'] == 0:
             if result.get('audit_id'):
                 database.delete_audit(result['audit_id'])
             logger.warning(f"Upload rejected, no valid rows in {safe_name}")
             reason = (
-                f"Semua {duplicates} link duplikat di dalam file."
-                if duplicates else
+                f"Semua {summary['duplicates']} link duplikat di dalam file."
+                if summary['duplicates'] else
                 f"Tidak ada task valid. {empty_rows} baris kosong, "
                 f"{invalid_urls} link bukan Instagram/TikTok."
             )
             return jsonify({"error": reason, **summary}), 400
 
         logger.info(
-            f"Uploaded audit '{audit_name}' with {inserted} targets "
-            f"({duplicates} duplicates, {empty_rows} empty, {invalid_urls} invalid) "
+            f"Uploaded audit '{audit_name}' with {summary['inserted']} targets "
+            f"({summary['duplicates']} duplicates, {empty_rows} empty, {invalid_urls} invalid) "
             f"from {safe_name}"
         )
         return jsonify({"success": True, **summary})
@@ -707,8 +709,7 @@ def submit_result():
 @require_api_key
 def get_latest():
     audit_id = _parse_int_arg(request.args.get('audit_id'))
-    limit = _parse_int_arg(request.args.get('limit')) or 10
-    limit = max(1, min(50, limit))
+    limit = database.clamp_limit(_parse_int_arg(request.args.get('limit')), 1, 50, 10)
     return jsonify(database.get_latest_tasks(limit=limit, audit_id=audit_id))
 
 
@@ -917,15 +918,18 @@ if __name__ == '__main__':
     if DEBUG_MODE:
         logger.warning("Flask debug mode is ON. Do not use it outside local development.")
 
-    print("")
-    print("  +======================================+")
-    print("  |   sunscraping — Backend Server       |")
-    print("  +======================================+")
-    print(f"  |  URL  : http://localhost:{PORT:<13}|")
-    print(f"  |  PID  : {os.getpid():<28}|")
-    print(f"  |  Debug: {'ON' if DEBUG_MODE else 'OFF':<28}|")
-    print(f"  |  Key  : lihat {os.path.basename(KEY_FILE):<25}|")
-    print("  +======================================+")
-    print("")
+    banner = "\n".join([
+        "",
+        "  +======================================+",
+        "  |   sunscraping — Backend Server       |",
+        "  +======================================+",
+        f"  |  URL  : http://localhost:{PORT:<13}|",
+        f"  |  PID  : {os.getpid():<28}|",
+        f"  |  Debug: {'ON' if DEBUG_MODE else 'OFF':<28}|",
+        f"  |  Key  : lihat {os.path.basename(KEY_FILE):<25}|",
+        "  +======================================+",
+        "",
+    ])
+    logger.info(banner)
 
     app.run(host='127.0.0.1', port=PORT, debug=DEBUG_MODE)

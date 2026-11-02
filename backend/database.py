@@ -114,6 +114,19 @@ def _infer_error_code(status, message, explicit=None):
     return 'TRANSIENT'
 
 
+def parse_repeat_days(value):
+    """Repeat interval clamped to 0-365 days, or None when the value is not a number."""
+    try:
+        return max(0, min(365, int(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def clamp_limit(value, lo, hi, default):
+    """Page size clamped to [lo, hi]; blank or zero falls back to default."""
+    return max(lo, min(hi, int(value or default)))
+
+
 def init_db():
     conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
@@ -296,11 +309,7 @@ def migrate_legacy(cursor):
         if run_row:
             run_id = run_row['id']
         else:
-            cursor.execute(
-                "INSERT INTO runs (audit_id, trigger, status, created_at) VALUES (?, 'migration', 'DONE', ?)",
-                (audit_id, _sql_now()),
-            )
-            run_id = cursor.lastrowid
+            run_id = _insert_run(cursor, audit_id, 'migration', 'DONE')
 
         cursor.execute(
             "SELECT * FROM tasks WHERE audit_id IS NULL ORDER BY id ASC"
@@ -476,34 +485,72 @@ def _reclaim_expired(cursor):
         _finalize_run(cursor, run_id)
 
 
-def _create_run(cursor, audit_id, trigger='manual'):
+def _insert_run(cursor, audit_id, trigger, status='RUNNING'):
     cursor.execute(
-        "INSERT INTO runs (audit_id, trigger, status, created_at) VALUES (?, ?, 'RUNNING', ?)",
-        (audit_id, trigger, _sql_now()),
+        "INSERT INTO runs (audit_id, trigger, status, created_at) VALUES (?, ?, ?, ?)",
+        (audit_id, trigger, status, _sql_now()),
     )
-    run_id = cursor.lastrowid
+    return cursor.lastrowid
+
+
+def _insert_task(cursor, audit_id, run_id, target):
+    """Queue one task for a target row (targets table row or _insert_target output)."""
+    cursor.execute(
+        "INSERT INTO tasks (url, platform, username, tema, audit_id, run_id, target_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (target['url'], target['platform'], target['username'], target['tema'],
+         audit_id, run_id, target['id']),
+    )
+
+
+def _insert_target(cursor, audit_id, task, seen):
+    """Sanitize one upload row and store it as a target of this audit.
+
+    Returns ('invalid', None) for rows without a usable url/platform,
+    ('duplicate', None) when the link was already seen in this batch or is
+    already stored, and ('inserted', row) with the new target id on success.
+    """
+    url = _clean_text(task.get('url'), 2048)
+    platform = _clean_text(task.get('platform'), 32)
+    if not url or platform not in ('instagram', 'tiktok'):
+        return 'invalid', None
+    if url in seen:
+        return 'duplicate', None
+    seen.add(url)
+
+    row = {
+        'url': url,
+        'platform': platform,
+        'username': _clean_text(task.get('username'), 100),
+        'tema': _clean_text(task.get('tema'), 150),
+    }
+    cursor.execute(
+        "INSERT OR IGNORE INTO targets (audit_id, platform, url, username, tema, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (audit_id, row['platform'], row['url'], row['username'], row['tema'], _sql_now()),
+    )
+    if cursor.rowcount == 0:
+        return 'duplicate', None
+    row['id'] = cursor.lastrowid
+    return 'inserted', row
+
+
+def _create_run(cursor, audit_id, trigger='manual'):
+    run_id = _insert_run(cursor, audit_id, trigger)
     cursor.execute(
         "SELECT id, platform, url, username, tema FROM targets WHERE audit_id = ? ORDER BY id ASC",
         (audit_id,),
     )
     targets = cursor.fetchall()
-    created = 0
     for target in targets:
-        cursor.execute('''
-            INSERT INTO tasks (url, platform, username, tema, audit_id, run_id, target_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            target['url'], target['platform'], target['username'], target['tema'],
-            audit_id, run_id, target['id'],
-        ))
-        created += 1
+        _insert_task(cursor, audit_id, run_id, target)
     cursor.execute("UPDATE audits SET last_run_at = ? WHERE id = ?", (_sql_now(), audit_id))
-    if created == 0:
+    if not targets:
         cursor.execute(
             "UPDATE runs SET status = 'DONE', finished_at = ? WHERE id = ?",
             (_sql_now(), run_id),
         )
-    return run_id, created
+    return run_id, len(targets)
 
 
 def _auto_enqueue_due(cursor, limit=5):
@@ -579,10 +626,8 @@ def create_audit_with_tasks(tasks_list, name=None, repeat_days=0, source_filenam
         return {'audit_id': None, 'run_id': None, 'inserted': 0, 'duplicates': 0}
 
     name = _clean_text(name, 120) or f"Audit {datetime.now().strftime('%d-%m-%Y %H:%M')}"
-    try:
-        repeat_days = max(0, min(365, int(repeat_days or 0)))
-    except (TypeError, ValueError):
-        repeat_days = 0
+    clamped = parse_repeat_days(repeat_days)
+    repeat_days = 0 if clamped is None else clamped
 
     conn = get_db_connection()
     try:
@@ -594,41 +639,19 @@ def create_audit_with_tasks(tasks_list, name=None, repeat_days=0, source_filenam
             (name, _clean_text(source_filename, 200), repeat_days, _sql_now(), _sql_now()),
         )
         audit_id = cursor.lastrowid
-        cursor.execute(
-            "INSERT INTO runs (audit_id, trigger, status, created_at) VALUES (?, 'upload', 'RUNNING', ?)",
-            (audit_id, _sql_now()),
-        )
-        run_id = cursor.lastrowid
+        run_id = _insert_run(cursor, audit_id, 'upload')
 
         inserted = 0
         duplicates = 0
         seen = set()
         for task in tasks_list:
-            url = _clean_text(task.get('url'), 2048)
-            platform = _clean_text(task.get('platform'), 32)
-            if not url or platform not in ('instagram', 'tiktok'):
+            outcome, row = _insert_target(cursor, audit_id, task, seen)
+            if outcome == 'invalid':
                 continue
-            if url in seen:
+            if outcome == 'duplicate':
                 duplicates += 1
                 continue
-            seen.add(url)
-
-            username = _clean_text(task.get('username'), 100)
-            tema = _clean_text(task.get('tema'), 150)
-            cursor.execute(
-                "INSERT OR IGNORE INTO targets (audit_id, platform, url, username, tema, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (audit_id, platform, url, username, tema, _sql_now()),
-            )
-            if cursor.rowcount == 0:
-                duplicates += 1
-                continue
-            target_id = cursor.lastrowid
-
-            cursor.execute('''
-                INSERT INTO tasks (url, platform, username, tema, audit_id, run_id, target_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (url, platform, username, tema, audit_id, run_id, target_id))
+            _insert_task(cursor, audit_id, run_id, row)
             inserted += 1
 
         conn.commit()
@@ -712,41 +735,20 @@ def append_targets_to_audit(audit_id, tasks_list, source_filename=None):
         seen = set()
         pending = []
         for task in tasks_list:
-            url = _clean_text(task.get('url'), 2048)
-            platform = _clean_text(task.get('platform'), 32)
-            if not url or platform not in ('instagram', 'tiktok'):
+            outcome, row = _insert_target(cursor, audit_id, task, seen)
+            if outcome == 'invalid':
                 continue
-            if url in seen:
+            if outcome == 'duplicate':
                 duplicates += 1
                 continue
-            seen.add(url)
-
-            username = _clean_text(task.get('username'), 100)
-            tema = _clean_text(task.get('tema'), 150)
-            cursor.execute(
-                "INSERT OR IGNORE INTO targets (audit_id, platform, url, username, tema, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (audit_id, platform, url, username, tema, _sql_now()),
-            )
-            if cursor.rowcount == 0:
-                duplicates += 1
-                continue
-            pending.append((cursor.lastrowid, url, platform, username, tema))
+            pending.append(row)
             inserted += 1
 
         run_id = None
         if pending:
-            cursor.execute(
-                "INSERT INTO runs (audit_id, trigger, status, created_at) "
-                "VALUES (?, 'append', 'RUNNING', ?)",
-                (audit_id, _sql_now()),
-            )
-            run_id = cursor.lastrowid
-            for target_id, url, platform, username, tema in pending:
-                cursor.execute('''
-                    INSERT INTO tasks (url, platform, username, tema, audit_id, run_id, target_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (url, platform, username, tema, audit_id, run_id, target_id))
+            run_id = _insert_run(cursor, audit_id, 'append')
+            for row in pending:
+                _insert_task(cursor, audit_id, run_id, row)
             cursor.execute(
                 "UPDATE audits SET last_run_at = ?, source_filename = COALESCE(?, source_filename) "
                 "WHERE id = ?",
@@ -807,20 +809,9 @@ def retry_failed_targets(audit_id):
 
         run_id = None
         if targets:
-            cursor.execute(
-                "INSERT INTO runs (audit_id, trigger, status, created_at) "
-                "VALUES (?, 'retry', 'RUNNING', ?)",
-                (audit_id, _sql_now()),
-            )
-            run_id = cursor.lastrowid
+            run_id = _insert_run(cursor, audit_id, 'retry')
             for target in targets:
-                cursor.execute('''
-                    INSERT INTO tasks (url, platform, username, tema, audit_id, run_id, target_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (
-                    target['url'], target['platform'], target['username'], target['tema'],
-                    audit_id, run_id, target['id'],
-                ))
+                _insert_task(cursor, audit_id, run_id, target)
             cursor.execute("UPDATE audits SET last_run_at = ? WHERE id = ?", (_sql_now(), audit_id))
 
         conn.commit()
@@ -1108,7 +1099,7 @@ def get_target_with_audit(target_id):
 def get_targets(audit_id=None, status=None, platform=None, query=None,
                 sort='recent', direction='desc', limit=50, offset=0):
     """Target-level rows with latest task status and latest snapshot metrics."""
-    limit = max(1, min(200, int(limit or 50)))
+    limit = clamp_limit(limit, 1, 200, 50)
     offset = max(0, int(offset or 0))
 
     base = '''
@@ -1326,11 +1317,9 @@ def update_audit(audit_id, name=None, repeat_days=None):
             if clean_name:
                 cursor.execute("UPDATE audits SET name = ? WHERE id = ?", (clean_name, audit_id))
         if repeat_days is not None:
-            try:
-                repeat_days = max(0, min(365, int(repeat_days)))
-            except (TypeError, ValueError):
-                repeat_days = 0
-            cursor.execute("UPDATE audits SET repeat_days = ? WHERE id = ?", (repeat_days, audit_id))
+            clamped = parse_repeat_days(repeat_days)
+            cursor.execute("UPDATE audits SET repeat_days = ? WHERE id = ?",
+                           (0 if clamped is None else clamped, audit_id))
         conn.commit()
     finally:
         conn.close()
