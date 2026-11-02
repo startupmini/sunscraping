@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "sunscraping",
+  "short_name": "sunscraping",
+  "version": "1.4.0",
+  "description": "Audit engagement Instagram & TikTok berulang — likes, comments, views, follower count, tren snapshot.",
+  "permissions": [
+    "storage",
+    "tabs",
+    "alarms",
+    "notifications"
+  ],
+  "host_permissions": [
+    "*://*.instagram.com/*",
+    "*://*.tiktok.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "popup/options.html",
+    "open_in_tab": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.instagram.com/*"],
+      "js": ["content/ig-scraper.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.tiktok.com/*"],
+      "js": ["content/tk-scraper.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

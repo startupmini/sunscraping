@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Database
+*.db
+*.db-wal
+*.db-shm
+
+# Server
+backend/server.pid
+backend/server_log.txt
+backend/server_log.old
+backend/uploads/
+backend/runtime/
+backend/.api_key
+backend/.session_secret
+
+# Environment
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini

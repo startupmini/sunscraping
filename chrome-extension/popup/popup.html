@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="popup-shell">
+    <header class="popup-header">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="6 6 36 36" focusable="false"><path fill="#FF9800" d="M11 11H37V37H11z"/><path fill="#FF9800" d="M11.272 11.272H36.728V36.728H11.272z" transform="rotate(-45.001 24 24)"/><path fill="#FFEB3B" d="M13,24c0,6.077,4.923,11,11,11c6.076,0,11-4.923,11-11s-4.924-11-11-11C17.923,13,13,17.923,13,24"/></svg></span>
+      <h1>sun<span>scraping</span></h1>
+    </header>
+
+    <section class="status-card">
+      <div id="statusBadge" class="status-badge status-idle">
+        <span class="status-dot"></span>
+        <span>Siaga</span>
+      </div>
+
+      <p id="statusHint" role="status" aria-live="polite">Siap memproses antrean.</p>
+
+      <p class="status-meta">
+        <span id="modeValue">Mode aman</span>
+        <span class="meta-sep" aria-hidden="true">·</span>
+        <span>Antrean <span id="queueValue">—</span></span>
+        <span class="meta-sep" aria-hidden="true">·</span>
+        <span>Kuota <span id="quotaValue">—</span></span>
+      </p>
+    </section>
+
+    <button id="toggleBtn" type="button" class="btn btn-start">
+      <span class="btn-icon btn-icon-play" aria-hidden="true"></span>
+      <span class="btn-label">Mulai worker</span>
+    </button>
+
+    <nav class="link-row" aria-label="Tautan">
+      <a id="dashboardLink" href="http://localhost:5000" target="_blank" rel="noopener">Dashboard</a>
+      <span class="link-sep" aria-hidden="true">·</span>
+      <button id="settingsBtn" type="button" class="link-btn">Pengaturan</button>
+    </nav>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>
