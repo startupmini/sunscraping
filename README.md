@@ -3,7 +3,8 @@
 > Audit engagement kampanye influencer di Instagram & TikTok — batch, berkala, dan tanpa API berbayar.
 > Chrome Extension + Flask Backend, berjalan sepenuhnya di perangkat sendiri.
 >
-> Sebelumnya bernama *Social Auditor*; nama folder, file launcher, dan file DB masih memakai nama lama.
+> Sebelumnya bernama *Social Auditor*. Nama folder root masih `social-auditor` secara sengaja
+> (alasan dan konsekuensinya di bagian Struktur direktori); launcher, database, dan merek di UI sudah sunscraping.
 
 ---
 
@@ -26,42 +27,76 @@
 ## Arsitektur
 
 ```
-social-auditor/
-├── backend/                    # Flask Backend (Python)
-│   ├── app.py                  # REST API, SSE, dashboard route, export
-│   ├── database.py             # SQLite data layer (audits/runs/targets/snapshots)
+social-auditor/                     # nama folder root dipertahankan — lihat catatan di bawah
+├── sunscraping.hta                 # Control Panel harian: start/stop, health, API key
+├── INSTALL_sunscraping.bat         # pasang sekali: Python + dependencies, lalu buka panel
+├── START_sunscraping.bat           # jalankan server manual, tanpa panel
+├── run_hidden.bat                  # runner headless yang dipanggil Control Panel
+├── README.md  .env.example  .gitignore
+├── assets-src/
+│   └── icon.svg                    # master artwork logo
+├── backend/                        # Flask Backend (Python)
+│   ├── app.py                      # REST API, SSE, route dashboard, export
+│   ├── database.py                 # SQLite data layer (audits/runs/targets/snapshots)
+│   ├── requirements.txt            # Python dependencies
 │   ├── templates/
-│   │   └── dashboard.html      # Dashboard UI (tanpa framework/CDN)
-│   ├── requirements.txt        # Python dependencies
-│   └── uploads/                # Temporary upload & export folder
-├── chrome-extension/           # Chrome Extension (Manifest V3)
-│   ├── manifest.json           # Extension config
-│   ├── background.js           # Service Worker — queue, tab worker, pause/backoff
+│   │   └── dashboard.html          # markup dashboard (Jinja hanya untuk URL aset)
+│   ├── static/
+│   │   ├── dashboard.css           # styling dashboard
+│   │   └── dashboard.js            # logic dashboard (IIFE, tanpa framework/CDN)
+│   ├── sunscraping.db              # data — tidak ikut git
+│   └── runtime/                    # state hasil eksekusi — tidak ikut git
+│       ├── server_log.txt          # log stdout/stderr server
+│       └── uploads/exports/        # file sementara & hasil export
+├── chrome-extension/               # Chrome Extension (Manifest V3)
+│   ├── manifest.json               # Extension config
+│   ├── config.js                   # satu sumber alamat backend untuk semua permukaan
+│   ├── background.js               # Service Worker — queue, tab worker, pause/backoff
 │   ├── content/
-│   │   ├── ig-scraper.js       # Instagram content script (berlapis)
-│   │   └── tk-scraper.js       # TikTok content script (berlapis)
+│   │   ├── common.js               # helper yang dipakai kedua scraper
+│   │   ├── ig-scraper.js           # Instagram content script (berlapis)
+│   │   └── tk-scraper.js           # TikTok content script (berlapis)
+│   ├── icons/                      # icon16/48/128.png
 │   ├── popup/
-│   │   ├── popup.html          # Popup status worker
-│   │   ├── popup.js            # Popup logic (mode, kuota, start/stop)
+│   │   ├── popup.html              # Popup status worker
+│   │   ├── popup.js                # Popup logic (mode, kuota, start/stop)
 │   │   ├── popup.css
-│   │   ├── options.html        # Settings (pairing API key)
+│   │   ├── options.html            # Settings (pairing API key)
 │   │   └── options.js
 │   └── utils/
-│       └── rate-limiter.js     # Safety throttling engine
-├── tests/
-│   └── test_api_smoke.py       # Smoke test API dengan DB sementara
-├── SocialAuditor.hta           # Windows Control Panel
-├── INSTALL_DAN_JALANKAN.bat    # 1-click installer
-├── START_SocialAuditor.bat     # Manual server starter
-├── run_hidden.bat              # Headless server runner (dipakai HTA)
-└── README.md
+│       └── rate-limiter.js         # Safety throttling engine
+└── tests/
+    └── test_api_smoke.py           # Smoke test API dengan DB sementara
 ```
+
+**Kenapa folder root masih `social-auditor`?** Nama itu sudah dipakai sebagai path absolut di
+beberapa pintasan dan skrip pihak pengguna, sedangkan tidak satu pun kode di dalam project
+yang membaca namanya. Memindah hanya merusak pintasan tanpa memperbaiki struktur. Launcher
+sengaja berada di root: titik masuk pengguna di root, implementasi di subfolder.
+
+**Regenerate ikon PNG.** `assets-src/icon.svg` adalah artwork master; `chrome-extension/icons/`
+hanyalah hasil ekspor. Setelah mengubah logo, ekspor ulang ke 16/48/128 px (mis. dengan
+`magick -background none assets-src/icon.svg -resize 128x128 chrome-extension/icons/icon128.png`
+atau lewat browser + canvas) sebelum memuat ulang extension.
+
+## Cara menjalankan
+
+| Kebutuhan | Pakai |
+|---|---|
+| Mesin baru / clone pertama, sekali saja | `INSTALL_sunscraping.bat` — pasang Python + dependencies lalu membuka Control Panel |
+| Menyalakan server tanpa panel (mis. dari terminal) | `START_sunscraping.bat` |
+| Kontrol harian: start, stop, health, salin API key, buka dashboard | `sunscraping.hta` |
+| Menyalakan server tanpa jendela sama sekali | `run_hidden.bat` (dipanggil panel; bukan untuk diklik langsung) |
+
+Semua launcher berjalan dari direktori project dan mencari `backend\app.py` secara absolut,
+jadi shortcut di desktop pun tetap bekerja setelah folder dipindah, selama nama folder induknya
+ikut berubah di shortcut tersebut.
 
 ## Quick Start
 
 ### Cara 1: Auto Install (Recommended)
 
-1. Double-click `INSTALL_DAN_JALANKAN.bat`
+1. Double-click `INSTALL_sunscraping.bat`
 2. Script memasang Python (jika belum ada) + dependencies
 3. Control Panel terbuka otomatis
 
@@ -86,6 +121,11 @@ Key ditampilkan (disamarkan) di Control Panel dengan tombol **Salin**.
 2. Isi **API Base** (`http://localhost:5000`) dan **API Key**
 3. Klik **Uji koneksi** (memakai nilai formulir, belum menyimpan), lalu **Simpan** jika valid
 
+Angka `5000` di atas bukan hiasan: popup, options, dan service worker sama-sama membacanya dari
+`chrome-extension/config.js`, dan daftar origin CORS backend diturunkan dari `SA_PORT`. Ubah port
+di satu sisi tanpa sisi lainnya membuat extension menolak terhubung dengan pesan yang terlihat
+seperti masalah API key.
+
 Popup menampilkan status backend dari `/api/health`, memakai base URL yang disimpan, dan
 menonaktifkan **Mulai worker** saat backend offline atau API key belum diatur. Tombol
 **Dashboard** mengikuti alamat backend yang dikonfigurasi.
@@ -95,7 +135,7 @@ Dashboard memakai session cookie `HttpOnly` + `SameSite=Strict`, bukan API key d
 
 ## Alur Penggunaan
 
-1. **Mulai server** — Control Panel atau `START_SocialAuditor.bat`.
+1. **Mulai server** — Control Panel (`sunscraping.hta`) atau `START_sunscraping.bat`.
 2. **Impor target** — Buka dashboard, unggah CSV/XLSX, isi **Nama audit** dan **Ulang (hari)** (0 = manual). Gunakan **Template CSV** atau centang **Tambahkan ke audit terpilih** untuk menggabungkan file ke audit yang sudah ada.
 3. **Mulai worker** — Klik ikon extension → **Mulai worker**; biarkan Chrome tetap terbuka.
 4. **Pantau** — Dashboard menampilkan antrean, snapshot terbaru, delta, dan status koneksi (Live/Polling).
@@ -112,7 +152,7 @@ Dashboard memakai session cookie `HttpOnly` + `SameSite=Strict`, bukan API key d
 | `Akun` / `User` | ❌ | Username akun (opsional, bisa terdeteksi dari halaman) |
 | `Tema` / `Title` | ❌ | Label/kategori kampanye |
 
-Maksimal **10.000 baris** per upload (file ≤ 12 MB). Duplikat link di dalam satu file atau di
+Maksimal **10.000 baris** per upload (file ≤ 10 MB). Duplikat link di dalam satu file atau di
 audit tujuan dilewati. URL yang sama boleh dipakai lagi pada audit baru. CSV mendukung pemisah
 koma/titik-koma dan BOM UTF-8; preview client-side tersedia untuk CSV.
 
@@ -135,9 +175,17 @@ ketika audit yang sama diperiksa berulang kali.
 | Environment Variable | Default | Deskripsi |
 |---|---|---|
 | `SA_API_KEY` | auto-generated | Override API key; jika kosong, key dibuat di `backend/.api_key` |
-| `SA_PORT` | `5000` | Port server backend (bind ke `127.0.0.1` saja); Control Panel membaca nilai ini otomatis |
-| `SA_DB_PATH` | `backend/social_auditor.db` | Lokasi database SQLite |
+| `SA_PORT` | `5000` | Port server backend (bind ke `127.0.0.1` saja); Control Panel membaca nilai ini otomatis, begitu juga daftar origin CORS — dan `chrome-extension/config.js` harus memakai port yang sama |
+| `SA_DB_PATH` | `backend/sunscraping.db` | Lokasi database SQLite |
 | `FLASK_DEBUG` | `false` | Debug mode (jangan dipakai untuk operasional) |
+
+`backend/.env.example` berisi salinan variabel yang sama, tapi backend tidak memuat `.env` secara
+otomatis — export di shell, atau set lewat `run_hidden.bat` / `START_sunscraping.bat`.
+
+State runtime tidak ikut version control dan aman dihapus kapan saja (server membuatnya ulang):
+`backend/runtime/` (log, upload, export), `backend/server.pid`, `backend/.api_key`, dan
+`backend/.session_secret`. Menghapus dua yang terakhir memaksa pairing ulang: key baru dibuat dan
+session dashboard semua browser aktif terputus.
 
 ## API Endpoints
 
@@ -221,7 +269,7 @@ target, retry gagal, heartbeat, dan export dengan filter status.
 | Audit tidak berjalan otomatis | Isi **Ulang (hari)** > 0 atau klik **Audit ulang**. Penjadwalan otomatis hanya aktif saat antrean kosong. |
 | Task stuck di RUNNING | Task otomatis kembali ke PENDING setelah 5 menit (maks. 3 retry untuk error transient). |
 | Halaman minta login | Instagram/TikTok membatasi akses anonim. Login manual di Chrome, lalu lanjutkan worker. |
-| Upload gagal | Cek kolom `Link`, ukuran file (≤ 12 MB), dan maksimal 10.000 baris. |
+| Upload gagal | Cek kolom `Link`, ukuran file (≤ 10 MB), dan maksimal 10.000 baris. |
 | Export kosong | Audit belum punya snapshot; jalankan worker sampai minimal satu target selesai. |
 
 ## Disclaimer
