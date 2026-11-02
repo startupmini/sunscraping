@@ -420,10 +420,11 @@
             if (!confirm("Hentikan server sunscraping?")) return;
             pendingDashboardOpen = false;
             stopServerSilent();
-            wasOnline = false;
+            // handleOffline() menyelaraskan tombol; polling sudah dimatikan, jadi
+            // status harus ditulis ulang agar tidak kembali berbunyi "Nonaktif".
+            handleOffline();
             setStatus("offline", "Dihentikan", "-");
             serverPID = null;
-            updateTaskStats(0, 0, 0, 0);
         }
 
         function stopServerSilent() {
