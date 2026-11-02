@@ -1,7 +1,8 @@
 /**
  * sunscraping — Instagram Content Script
  * Membaca data postingan dari halaman Instagram yang sudah dirender browser.
- * Dijalankan di dalam tab Instagram via chrome.scripting.executeScript
+ * Didukung sebagai content script di manifest; background mengirim pesan
+ * scrapePost/scrapeProfile dan menunggu balasan dari script ini.
  */
 
 (function() {

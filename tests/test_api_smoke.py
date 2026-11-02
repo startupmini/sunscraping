@@ -242,6 +242,50 @@ class ApiSmokeTest(unittest.TestCase):
         self.assertTrue(failed_export.data.startswith(b'PK'))
         failed_export.close()
 
+    def test_05_append_rejects_empty_and_missing_audit(self):
+        empty = self.upload(
+            [
+                ['https://example.com/not-social', 'nope', 'Invalid'],
+                ['', '', ''],
+            ],
+            audit_id=str(self.audit_id),
+        )
+        self.assertEqual(empty.status_code, 400, empty.get_data(as_text=True))
+        self.assertEqual(
+            empty.get_json()['error'],
+            'Tidak ada target valid untuk ditambahkan.',
+        )
+
+        missing = self.upload(
+            [['https://www.instagram.com/p/DDD444/', 'dave', 'Kampanye D']],
+            audit_id='999999',
+        )
+        self.assertEqual(missing.status_code, 404, missing.get_data(as_text=True))
+        self.assertEqual(
+            missing.get_json()['error'],
+            'Audit yang dipilih tidak ditemukan.',
+        )
+
+    def test_06_upload_ceiling_is_a_single_number(self):
+        self.assertEqual(
+            app_module.app.config['MAX_CONTENT_LENGTH'],
+            app_module.MAX_UPLOAD_BYTES,
+        )
+
+        oversized = b'Link,Username,Tema\n' + b'x' * (app_module.MAX_UPLOAD_BYTES + 1)
+        response = self.client.post(
+            '/api/upload',
+            data={'file': (io.BytesIO(oversized), 'oversize.csv')},
+            headers=API_HEADERS,
+            content_type='multipart/form-data',
+        )
+        self.assertEqual(response.status_code, 413)
+        expected_mb = app_module.MAX_UPLOAD_BYTES // (1024 * 1024)
+        self.assertEqual(
+            response.get_json()['error'],
+            f'File terlalu besar (max {expected_mb}MB).',
+        )
+
 
 def tearDownModule():
     _TMP.cleanup()

@@ -84,12 +84,15 @@ if os.environ.get('SA_API_KEY', '').strip() and os.environ['SA_API_KEY'].strip()
     except OSError:
         pass
 
+PORT = int(os.environ.get('SA_PORT', '5000'))
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # single ceiling for both the 413 handler and the size check
+
 app.config.update(
     SECRET_KEY=_load_or_create_file(SECRET_FILE, lambda: secrets.token_hex(32)),
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Strict',
     SESSION_COOKIE_NAME='sa_dashboard',
-    MAX_CONTENT_LENGTH=12 * 1024 * 1024,
+    MAX_CONTENT_LENGTH=MAX_UPLOAD_BYTES,
 )
 
 DEBUG_MODE = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
@@ -98,15 +101,14 @@ DEBUG_MODE = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 CORS(
     app,
     resources={r"/api/*": {"origins": [
-        "http://localhost:5000",
-        "http://127.0.0.1:5000",
+        f"http://localhost:{PORT}",
+        f"http://127.0.0.1:{PORT}",
         r"^chrome-extension://[a-p]{32}$",
     ]}},
     allow_headers=["Content-Type", "X-API-Key"],
     methods=["GET", "POST"],
 )
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 MAX_ROWS = 10000
 
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
@@ -478,13 +480,8 @@ def upload_file():
     if uploaded.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    # Validate file size before touching the disk
-    uploaded.seek(0, os.SEEK_END)
-    file_size = uploaded.tell()
-    uploaded.seek(0)
-    if file_size > MAX_FILE_SIZE:
-        return jsonify({"error": f"File terlalu besar (max {MAX_FILE_SIZE // (1024 * 1024)}MB)"}), 400
-
+    # MAX_CONTENT_LENGTH enforces the ceiling while the body is parsed; the 413
+    # handler reports it, so no per-file size check is needed here.
     safe_name = secure_filename(uploaded.filename)
     if not safe_name:
         return jsonify({"error": "Invalid filename"}), 400
@@ -559,11 +556,14 @@ def upload_file():
         append_audit_id = _parse_int_arg(request.form.get('audit_id'))
 
         if append_audit_id:
-            result = database.append_targets_to_audit(
-                append_audit_id,
-                tasks,
-                source_filename=safe_name,
-            )
+            try:
+                result = database.append_targets_to_audit(
+                    append_audit_id,
+                    tasks,
+                    source_filename=safe_name,
+                )
+            except ValueError:
+                return jsonify({"error": "Tidak ada target valid untuk ditambahkan."}), 400
             if result is None:
                 return jsonify({"error": "Audit yang dipilih tidak ditemukan."}), 404
 
@@ -747,7 +747,7 @@ def auth_check():
 
 @app.errorhandler(413)
 def payload_too_large(error):
-    return jsonify({"error": "File terlalu besar (max 10MB)."}), 413
+    return jsonify({"error": f"File terlalu besar (max {MAX_UPLOAD_BYTES // (1024 * 1024)}MB)."}), 413
 
 
 def _to_number(value):
@@ -899,7 +899,6 @@ def graceful_shutdown(signum, frame):
     sys.exit(0)
 
 if __name__ == '__main__':
-    port = int(os.environ.get('SA_PORT', '5000'))
     key_source = 'SA_API_KEY env' if os.environ.get('SA_API_KEY', '').strip() else KEY_FILE
 
     # Register cleanup handlers
@@ -910,7 +909,7 @@ if __name__ == '__main__':
     # Write PID file
     write_pid()
 
-    logger.info(f"sunscraping backend starting on http://localhost:{port} (debug={DEBUG_MODE})")
+    logger.info(f"sunscraping backend starting on http://localhost:{PORT} (debug={DEBUG_MODE})")
     logger.info(f"API key source: {key_source}")
     if not os.environ.get('SA_API_KEY', '').strip():
         logger.info("Use the Control Panel or backend/.api_key to pair the Chrome extension.")
@@ -921,11 +920,11 @@ if __name__ == '__main__':
     print("  +======================================+")
     print("  |   sunscraping — Backend Server       |")
     print("  +======================================+")
-    print(f"  |  URL  : http://localhost:{port:<13}|")
+    print(f"  |  URL  : http://localhost:{PORT:<13}|")
     print(f"  |  PID  : {os.getpid():<28}|")
     print(f"  |  Debug: {'ON' if DEBUG_MODE else 'OFF':<28}|")
     print(f"  |  Key  : lihat {os.path.basename(KEY_FILE):<25}|")
     print("  +======================================+")
     print("")
 
-    app.run(host='127.0.0.1', port=port, debug=DEBUG_MODE)
+    app.run(host='127.0.0.1', port=PORT, debug=DEBUG_MODE)

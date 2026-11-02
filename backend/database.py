@@ -684,13 +684,18 @@ def enqueue_run(audit_id, trigger='manual'):
 
 
 def append_targets_to_audit(audit_id, tasks_list, source_filename=None):
-    """Add new targets to an existing audit and enqueue one fresh run."""
+    """Add new targets to an existing audit and enqueue one fresh run.
+
+    Returns None only when the audit does not exist. Raises ValueError when the
+    caller sends no usable rows or an unusable audit id, so the two cases do not
+    get reported to the user as a missing audit.
+    """
     if not tasks_list:
-        return None
+        raise ValueError('no target rows to append')
     try:
         audit_id = int(audit_id)
     except (TypeError, ValueError):
-        return None
+        raise ValueError('audit_id is not usable')
 
     conn = get_db_connection()
     try:

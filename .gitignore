@@ -28,6 +28,7 @@ backend/.session_secret
 # IDE
 .vscode/
 .idea/
+.qoder/settings.local.json
 *.swp
 *.swo
 
