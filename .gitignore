@@ -23,6 +23,9 @@ backend/.session_secret
 # Environment
 .env
 
+# Installer scratch (downloaded by INSTALL_sunscraping.bat)
+python_installer.exe
+
 # IDE
 .vscode/
 .idea/
