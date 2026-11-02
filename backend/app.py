@@ -86,6 +86,7 @@ if os.environ.get('SA_API_KEY', '').strip() and os.environ['SA_API_KEY'].strip()
 
 PORT = int(os.environ.get('SA_PORT', '5000'))
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # single ceiling for both the 413 handler and the size check
+ASSET_VERSION = '4'  # bump whenever dashboard.css/dashboard.js changes, so browsers drop the cache
 
 app.config.update(
     SECRET_KEY=_load_or_create_file(SECRET_FILE, lambda: secrets.token_hex(32)),
@@ -318,7 +319,7 @@ database.init_db()
 @app.route('/')
 def index():
     session['dashboard'] = True
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', asset_version=ASSET_VERSION)
 
 # ==========================================
 # API ENDPOINTS
