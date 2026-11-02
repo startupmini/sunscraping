@@ -7,7 +7,6 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='6 6 36 36'%3E%3Cpath fill='%23FF9800' d='M11 11H37V37H11z'/%3E%3Cpath fill='%23FF9800' d='M11.272 11.272H36.728V36.728H11.272z' transform='rotate(-45.001 24 24)'/%3E%3Cpath fill='%23FFEB3B' d='M13,24c0,6.077,4.923,11,11,11c6.076,0,11-4.923,11-11s-4.924-11-11-11C17.923,13,13,17.923,13,24'/%3E%3C/svg%3E">
 <style>
   :root {
-    --ink: #0b1220;
     --text: #172033;
     --muted: #475467;
     --faint: #667085;
@@ -35,11 +34,9 @@
     --fs-md: 13px;
     --fs-lg: 14px;
     --fs-xl: 16px;
-    --sp-1: 4px;
     --sp-2: 8px;
     --sp-3: 12px;
     --sp-4: 16px;
-    --sp-5: 24px;
   }
 
   * { box-sizing: border-box; }
@@ -1313,12 +1310,6 @@
     background: var(--danger-soft);
   }
 
-  .danger-zone h3 {
-    color: var(--danger);
-    font-size: 13px;
-    font-weight: 600;
-  }
-
   .danger-zone p {
     margin-top: 2px;
     color: var(--muted);
@@ -2097,10 +2088,6 @@
       node.textContent = sign + formatNumber(diff) + ' (' + sign + percent.toFixed(1).replace('.', ',') + '%)';
     }
     return node;
-  }
-
-  function platformLabel(platform) {
-    return platform === 'instagram' ? 'Instagram' : platform === 'tiktok' ? 'TikTok' : 'Lainnya';
   }
 
   function platformLabel(platform) {

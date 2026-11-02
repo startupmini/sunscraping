@@ -243,15 +243,6 @@ const RateLimiter = {
     return Math.round(delay);
   },
 
-  /**
-   * Wait for the calculated delay
-   */
-  async wait() {
-    const delay = this.getDelay();
-    await new Promise(resolve => setTimeout(resolve, delay));
-    return delay;
-  },
-
   // ============================================================
   // ERROR TRACKING
   // ============================================================
@@ -326,5 +317,3 @@ const RateLimiter = {
     return `${minutes}m`;
   }
 };
-
-if (typeof module !== 'undefined') module.exports = RateLimiter;

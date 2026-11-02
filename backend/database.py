@@ -111,8 +111,6 @@ def _infer_error_code(status, message, explicit=None):
         return 'AUTH'
     if any(token in text for token in ('private', 'tidak tersedia', 'not available', 'deleted', 'tidak ditemukan')):
         return 'PERMANENT'
-    if any(token in text for token in ('timeout', 'network', 'terlalu lambat', 'tidak dapat dihubungi')):
-        return 'TRANSIENT'
     return 'TRANSIENT'
 
 
@@ -645,12 +643,6 @@ def create_audit_with_tasks(tasks_list, name=None, repeat_days=0, source_filenam
         raise
     finally:
         conn.close()
-
-
-def insert_tasks(tasks_list):
-    """Backward-compatible wrapper: each upload is now its own audit cycle."""
-    result = create_audit_with_tasks(tasks_list)
-    return result['inserted'], result['duplicates']
 
 
 def enqueue_run(audit_id, trigger='manual'):
@@ -1393,19 +1385,3 @@ def clear_all_tasks():
         conn.commit()
     finally:
         conn.close()
-
-
-def get_all_tasks():
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM tasks ORDER BY id ASC")
-        rows = cursor.fetchall()
-    finally:
-        conn.close()
-    return [dict(row) for row in rows]
-
-
-def get_export_tasks():
-    """Compatibility shim; export now reads snapshots with delta history."""
-    return get_export_rows()

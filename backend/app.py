@@ -499,7 +499,7 @@ def upload_file():
 
     try:
         df = _read_dataframe(filepath, extension)
-        if df is None or len(df.columns) == 0:
+        if len(df.columns) == 0:
             return jsonify({"error": "File tidak berisi kolom yang bisa dibaca."}), 400
 
         truncated = len(df) > MAX_ROWS
