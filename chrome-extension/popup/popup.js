@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const DEFAULT_API_BASE = 'http://localhost:5000';
+  const DEFAULT_API_BASE = SA_CONFIG.apiBase;
   const HEALTH_TIMEOUT_MS = 4000;
   const HEALTH_REFRESH_MS = 8000;
   const STATUS_REFRESH_MS = 7000;

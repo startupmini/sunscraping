@@ -1,6 +1,6 @@
-importScripts('utils/rate-limiter.js');
+importScripts('config.js', 'utils/rate-limiter.js');
 
-const DEFAULT_API_BASE = 'http://localhost:5000';
+const DEFAULT_API_BASE = SA_CONFIG.apiBase;
 const POLL_ALARM = 'social-auditor-poll';
 const SCRAPE_TIMEOUT_MS = 60000;
 const FOLLOWER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;

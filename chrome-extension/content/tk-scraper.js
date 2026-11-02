@@ -15,15 +15,8 @@
 (function() {
   'use strict';
 
-  // ============================================================
-  // UTILITY: Parse count strings like "12.5K", "1.2M", "1234", "23rb"
-  // ============================================================
-  function truncateText(text, maxChars) {
-    if (text === null || text === undefined) return null;
-    const value = String(text);
-    const chars = Array.from(value);
-    return chars.length > maxChars ? chars.slice(0, maxChars).join('') : value;
-  }
+  // truncateText lives in content/common.js (shared with the Instagram scraper).
+  const truncateText = SA_CONTENT.truncateText;
 
   function detectBlockState() {
     const path = (window.location.pathname || '').toLowerCase();
@@ -44,6 +37,7 @@
     return null;
   }
 
+  // Parse count strings like "12.5K", "1.2M", "1234", "23rb"
   function parseCount(value) {
     if (value === null || value === undefined) return null;
     if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : null;

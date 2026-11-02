@@ -32,16 +32,8 @@
     return num === null ? null : Math.round(num);
   }
 
-  /**
-   * Truncate by code points so emoji (surrogate pairs) are never split.
-   * A split surrogate used to crash the backend SQLite writer.
-   */
-  function truncateText(text, maxChars) {
-    if (text === null || text === undefined) return null;
-    const value = String(text);
-    const chars = Array.from(value);
-    return chars.length > maxChars ? chars.slice(0, maxChars).join('') : value;
-  }
+  // truncateText lives in content/common.js (shared with the TikTok scraper).
+  const truncateText = SA_CONTENT.truncateText;
 
   function parseLocaleNumber(value, hasSuffix) {
     if (!value) return null;

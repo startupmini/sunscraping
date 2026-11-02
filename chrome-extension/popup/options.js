@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = 'http://localhost:5000';
+const DEFAULT_API_BASE = SA_CONFIG.apiBase;
 const TEST_TIMEOUT_MS = 7000;
 
 const settingsForm = document.getElementById('settingsForm');
@@ -10,6 +10,8 @@ const saveBtn = document.getElementById('saveBtn');
 const testBtn = document.getElementById('testBtn');
 const statusEl = document.getElementById('status');
 const dirtyHint = document.getElementById('dirtyHint');
+
+apiBaseInput.placeholder = DEFAULT_API_BASE;
 
 const savedValues = { base: DEFAULT_API_BASE, key: '' };
 let loading = true;
