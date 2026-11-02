@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <HTA:APPLICATION
-        ID="SocialAuditorLauncher"
+        ID="sunscrapingLauncher"
         APPLICATIONNAME="sunscraping"
         BORDER="dialog"
         INNERBORDER="no"
@@ -395,7 +395,7 @@
 
                 var htaDir = getHtaDir();
                 shell.CurrentDirectory = htaDir;
-                shell.Run("cmd.exe /c run_hidden.bat", 0, false);
+                shell.Run('cmd.exe /c "' + htaDir + '\\run_hidden.bat"', 0, false);
 
                 setStatus("starting", "Memulai...", "-");
                 document.getElementById("btnStart").disabled = true;
@@ -446,8 +446,11 @@
                     // Clean up PID file
                     try { fso.DeleteFile(pidFile); } catch(e) {}
                 } else {
-                    // Fallback: kill by specific command line pattern (more targeted than before)
-                    var cmd = 'powershell -windowstyle hidden -Command "Get-CimInstance Win32_Process -Filter \\"name=\'python.exe\'\\" | Where-Object {$_.CommandLine -like \'*social-auditor*app.py*\'} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"';
+                    // Fallback: match the absolute app.py path this launcher starts.
+                    // run_hidden.bat invokes python with the full path, so the command line is matchable.
+                    // Single quotes only — nested \" quoting is unreliable through shell.Run.
+                    var appPy = htaDir + "\\backend\\app.py";
+                    var cmd = 'powershell -windowstyle hidden -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq \'python.exe\' -and $_.CommandLine -like \'*' + appPy + '*\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"';
                     shell.Run(cmd, 0, true);
                 }
             } catch(e) {}

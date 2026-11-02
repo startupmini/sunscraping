@@ -1,7 +1,7 @@
 importScripts('config.js', 'utils/rate-limiter.js');
 
 const DEFAULT_API_BASE = SA_CONFIG.apiBase;
-const POLL_ALARM = 'social-auditor-poll';
+const POLL_ALARM = 'sunscraping-poll';
 const SCRAPE_TIMEOUT_MS = 60000;
 const FOLLOWER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const WORKER_TAB_KEY = 'sa_workerTabId';

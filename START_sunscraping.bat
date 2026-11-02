@@ -26,6 +26,6 @@ echo.
 
 if not defined SA_PORT set "SA_PORT=5000"
 start "" powershell -WindowStyle Hidden -Command "Start-Sleep -Seconds 4; Start-Process 'http://localhost:%SA_PORT%'"
-python app.py
+python "%~dp0backend\app.py"
 
 pause

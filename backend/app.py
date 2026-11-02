@@ -112,7 +112,8 @@ CORS(
 
 MAX_ROWS = 10000
 
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+RUNTIME_FOLDER = os.path.join(BASE_DIR, 'runtime')
+UPLOAD_FOLDER = os.path.join(RUNTIME_FOLDER, 'uploads')
 EXPORT_FOLDER = os.path.join(UPLOAD_FOLDER, 'exports')
 os.makedirs(EXPORT_FOLDER, exist_ok=True)
 

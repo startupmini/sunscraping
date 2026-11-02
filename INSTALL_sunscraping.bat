@@ -137,7 +137,7 @@ echo   [OK] Semua modul siap.
 echo   [4/4] Membuka Control Panel...
 echo.
 
-start SocialAuditor.hta
+start sunscraping.hta
 
 echo   ╔══════════════════════════════════════════╗
 echo   ║   SETUP SELESAI! Control Panel terbuka.  ║

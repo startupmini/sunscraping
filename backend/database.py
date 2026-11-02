@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.environ.get('SA_DB_PATH') or os.path.join(BASE_DIR, 'social_auditor.db')
+DB_PATH = os.environ.get('SA_DB_PATH') or os.path.join(BASE_DIR, 'sunscraping.db')
 TASK_LOCK_MINUTES = 5
 CACHE_TTL_MINUTES = 7 * 24 * 60
 MAX_RETRIES = 3

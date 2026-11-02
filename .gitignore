@@ -12,12 +12,10 @@ venv/
 *.db
 *.db-wal
 *.db-shm
+backend/*.db.bak
 
 # Server
 backend/server.pid
-backend/server_log.txt
-backend/server_log.old
-backend/uploads/
 backend/runtime/
 backend/.api_key
 backend/.session_secret
