@@ -151,6 +151,8 @@
     activityNote: document.getElementById('activityNote'),
     erInfoBtn: document.getElementById('erInfoBtn'),
     erInfo: document.getElementById('erInfo'),
+    erInfoClose: document.getElementById('erInfoClose'),
+    targetFilterReset: document.getElementById('targetFilterReset'),
     manageNote: document.getElementById('manageNote'),
     targetRetryBtn: document.getElementById('targetRetryBtn'),
     summaryPanel: document.getElementById('summaryPanel'),
@@ -254,6 +256,8 @@
     accountNext: document.getElementById('accountNext'),
     reachInfo: document.getElementById('reachInfo'),
     reachInfoBtn: document.getElementById('reachInfoBtn'),
+    reachInfoClose: document.getElementById('reachInfoClose'),
+    accountFilterReset: document.getElementById('accountFilterReset'),
     accountModal: document.getElementById('accountModal'),
     accountTitle: document.getElementById('accountTitle'),
     accountSub: document.getElementById('accountSub'),
@@ -2470,6 +2474,8 @@
     tr.dataset.targetId = item.target_id;
     tr.tabIndex = 0;
     tr.title = (item.url ? item.url + '\n' : '') + 'Klik atau tekan Enter untuk riwayat target';
+    if (item.status === 'FAILED') tr.classList.add('is-failed-row');
+    else if (item.status === 'PARTIAL') tr.classList.add('is-partial-row');
 
     var selectTd = make('td', 'col-select');
     var check = document.createElement('input');
@@ -2516,10 +2522,11 @@
     postTd.appendChild(make('span', 'metric-value',
       item.post_date ? formatDateTime(item.post_date) : '—'));
     if (item.url) {
-      var postLink = make('a', 'recap-link', 'buka');
+      var postLink = make('a', 'recap-link post-open-link', 'Post ↗');
       postLink.href = item.url;
       postLink.target = '_blank';
       postLink.rel = 'noopener noreferrer';
+      postLink.title = 'Buka postingan asli di tab baru';
       postTd.appendChild(postLink);
     }
     tr.appendChild(postTd);
@@ -4286,8 +4293,21 @@
       });
     });
 
+  function updateTargetFilterResetUi() {
+    if (!el.targetFilterReset) return;
+    var hasFilter = Boolean(el.targetSearch.value.trim() || el.targetStatus.value || el.targetPlatform.value || el.targetIssue.value);
+    el.targetFilterReset.hidden = !hasFilter;
+  }
+
+  function updateAccountFilterResetUi() {
+    if (!el.accountFilterReset) return;
+    var hasFilter = Boolean(el.accountSearch.value.trim() || el.accountLevel.value || el.accountBand.value || el.accountPlatform.value);
+    el.accountFilterReset.hidden = !hasFilter;
+  }
+
   el.targetSearch.addEventListener('input', function () {
     var value = el.targetSearch.value.trim();
+    updateTargetFilterResetUi();
     clearTimeout(searchTimer);
     searchTimer = setTimeout(function () {
       targetState.query = value;
@@ -4298,16 +4318,19 @@
 
   el.targetStatus.addEventListener('change', function () {
     targetState.status = el.targetStatus.value;
+    updateTargetFilterResetUi();
     loadTargets(true);
   });
 
   el.targetPlatform.addEventListener('change', function () {
     targetState.platform = el.targetPlatform.value;
+    updateTargetFilterResetUi();
     loadTargets(true);
   });
 
   el.targetIssue.addEventListener('change', function () {
     targetState.issue = el.targetIssue.value;
+    updateTargetFilterResetUi();
     loadTargets(true);
   });
 
@@ -4323,7 +4346,7 @@
     loadTargets(false);
   });
 
-  el.targetResetBtn.addEventListener('click', function () {
+  function resetTargetFilters() {
     el.targetSearch.value = '';
     el.targetStatus.value = '';
     el.targetPlatform.value = '';
@@ -4332,8 +4355,12 @@
     targetState.status = '';
     targetState.platform = '';
     targetState.issue = '';
+    targetState.offset = 0;
+    updateTargetFilterResetUi();
     loadTargets(true);
-  });
+  }
+  el.targetResetBtn.addEventListener('click', resetTargetFilters);
+  if (el.targetFilterReset) el.targetFilterReset.addEventListener('click', resetTargetFilters);
 
   el.targetRetryBtn.addEventListener('click', function () {
     el.targetRetryBtn.disabled = true;
@@ -4343,6 +4370,7 @@
 
   el.accountSearch.addEventListener('input', function () {
     var value = el.accountSearch.value.trim();
+    updateAccountFilterResetUi();
     clearTimeout(accountSearchTimer);
     accountSearchTimer = setTimeout(function () {
       accountState.query = value;
@@ -4353,13 +4381,37 @@
 
   el.accountLevel.addEventListener('change', function () {
     accountState.level = el.accountLevel.value;
+    updateAccountFilterResetUi();
     loadAccounts(true);
   });
 
   el.accountBand.addEventListener('change', function () {
     accountState.band = el.accountBand.value;
+    updateAccountFilterResetUi();
     loadAccounts(true);
   });
+
+  el.accountPlatform.addEventListener('change', function () {
+    accountState.platform = el.accountPlatform.value;
+    updateAccountFilterResetUi();
+    loadAccounts(true);
+  });
+
+  function resetAccountFilters() {
+    el.accountSearch.value = '';
+    el.accountLevel.value = '';
+    el.accountBand.value = '';
+    el.accountPlatform.value = '';
+    accountState.query = '';
+    accountState.level = '';
+    accountState.band = '';
+    accountState.platform = '';
+    accountState.offset = 0;
+    updateAccountFilterResetUi();
+    loadAccounts(true);
+  }
+  el.accountResetBtn.addEventListener('click', resetAccountFilters);
+  if (el.accountFilterReset) el.accountFilterReset.addEventListener('click', resetAccountFilters);
 
   el.accountPlatform.addEventListener('change', function () {
     accountState.platform = el.accountPlatform.value;
@@ -4433,6 +4485,13 @@
     el.reachInfoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
     el.reachInfoBtn.classList.toggle('is-active', open);
   });
+  if (el.reachInfoClose) {
+    el.reachInfoClose.addEventListener('click', function () {
+      el.reachInfo.hidden = true;
+      el.reachInfoBtn.setAttribute('aria-expanded', 'false');
+      el.reachInfoBtn.classList.remove('is-active');
+    });
+  }
 
   el.accountClose.addEventListener('click', closeAccountDetail);
   el.accountModal.addEventListener('click', function (event) {
@@ -4453,6 +4512,13 @@
     el.erInfoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
     el.erInfoBtn.classList.toggle('is-active', open);
   });
+  if (el.erInfoClose) {
+    el.erInfoClose.addEventListener('click', function () {
+      el.erInfo.hidden = true;
+      el.erInfoBtn.setAttribute('aria-expanded', 'false');
+      el.erInfoBtn.classList.remove('is-active');
+    });
+  }
 
   el.targetHead.addEventListener('click', function (event) {
     var button = event.target.closest('button[data-target-sort]');

@@ -273,7 +273,7 @@ select.control {
 
 /* ---------- Tables ---------- */
 .table-wrap { overflow: auto; max-height: calc(100vh - 210px); }
-table { width: 100%; border-collapse: collapse; font-size: var(--fs-table); }
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--fs-table); }
 thead th {
   position: sticky; top: 0; z-index: 2; height: var(--row-h); padding: 0 12px;
   border-bottom: 1px solid var(--line); background: var(--surface-sunken);
@@ -285,6 +285,7 @@ tbody td {
   height: var(--row-h); padding: 0 12px;
   border-bottom: 1px solid var(--line-soft); color: var(--text);
   vertical-align: middle; white-space: nowrap;
+  background: var(--surface);
 }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr { transition: background-color .12s ease; }
@@ -321,9 +322,103 @@ th.has-info .sort-btn { padding-right: 34px; }
 th.has-info .info-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
 
 .col-select { width: 36px; }
-.col-select input { width: 15px; height: 15px; vertical-align: middle; accent-color: var(--brand); }
+.col-select input { width: 15px; height: 15px; vertical-align: middle; accent-color: var(--brand); cursor: pointer; }
 @media (max-width: 1279px) { .col-share { display: none; } }
 @media (max-width: 1119px) { .col-comments { display: none; } }
+
+/* Sticky columns for tables with selection (Target) */
+#targetTableWrap th.col-select,
+#targetTableWrap td.col-select {
+  position: sticky; left: 0; z-index: 3;
+}
+#targetTableWrap thead th.col-select { z-index: 5; background: var(--surface-sunken); }
+#targetTableWrap tbody td.col-select { background: var(--surface); }
+#targetTableWrap tbody tr:hover td.col-select { background: #fffdfa; }
+
+#targetTableWrap th:nth-child(2),
+#targetTableWrap td.account-cell {
+  position: sticky; left: 36px; z-index: 3;
+}
+#targetTableWrap thead th:nth-child(2) { z-index: 5; background: var(--surface-sunken); }
+#targetTableWrap tbody td.account-cell { background: var(--surface); }
+#targetTableWrap tbody tr:hover td.account-cell { background: #fffdfa; }
+#targetTableWrap td.account-cell::after,
+#targetTableWrap thead th:nth-child(2)::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 1px;
+  background: var(--line); box-shadow: 2px 0 4px rgba(0,0,0,0.03);
+}
+
+/* Sticky Account column for tables without checkbox (Akun & Aktivitas) */
+#accountTableWrap th:first-child,
+#accountTableWrap td.account-cell,
+#tableWrap th:first-child,
+#tableWrap td.account-cell {
+  position: sticky; left: 0; z-index: 3;
+}
+#accountTableWrap thead th:first-child,
+#tableWrap thead th:first-child { z-index: 5; background: var(--surface-sunken); }
+#accountTableWrap tbody td.account-cell,
+#tableWrap tbody td.account-cell { background: var(--surface); }
+#accountTableWrap tbody tr:hover td.account-cell,
+#tableWrap tbody tr:hover td.account-cell { background: #fffdfa; }
+#accountTableWrap td.account-cell::after,
+#accountTableWrap thead th:first-child::after,
+#tableWrap td.account-cell::after,
+#tableWrap thead th:first-child::after {
+  content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 1px;
+  background: var(--line); box-shadow: 2px 0 4px rgba(0,0,0,0.03);
+}
+
+/* Failed and Partial Row Highlights */
+tbody tr.is-failed-row td:first-child {
+  border-left: 3px solid var(--danger);
+}
+tbody tr.is-failed-row {
+  background: rgba(239, 68, 68, 0.02);
+}
+tbody tr.is-failed-row:hover td {
+  background: #fff5f5;
+}
+tbody tr.is-partial-row td:first-child {
+  border-left: 3px solid var(--warning);
+}
+
+/* Post Open Link Button */
+.post-open-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; margin-left: 6px;
+  border-radius: var(--radius-xs); border: 1px solid var(--line);
+  background: var(--surface); color: var(--brand-dark);
+  font-size: 11px; font-weight: 600; text-decoration: none;
+  transition: all .15s ease;
+}
+.post-open-link:hover {
+  background: var(--brand-soft); border-color: var(--brand);
+  text-decoration: none; transform: translateY(-1px);
+}
+
+/* Floating Popovers for ER and Reach */
+.popover.er-popover,
+.popover.reach-popover {
+  position: relative;
+  max-width: 480px;
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--brand);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  animation: popoverFadeIn .15s ease;
+}
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.popover-note {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
 /* ---------- Database backup ---------- */
 .db-stats {
   display: grid;
@@ -440,8 +535,7 @@ th.has-info .info-btn { position: absolute; right: 10px; top: 50%; transform: tr
 #accountClusters { background: #fffdfa; color: var(--muted); font-size: 12px; line-height: 1.6; }
 #accountClusters .cluster-item { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: var(--radius-xs); background: var(--surface); border: 1px solid var(--line); font-size: 11px; }
 #accountClusters .cluster-item.is-strong { border-color: #fecaca; background: #fef2f2; color: var(--danger); font-weight: 700; }
-.target-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.page > .target-toolbar { margin: 0 0 14px; }
+.target-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
 .account-toolbar {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
   padding: 12px 16px; border-bottom: 1px solid var(--line);
@@ -449,16 +543,72 @@ th.has-info .info-btn { position: absolute; right: 10px; top: 50%; transform: tr
 }
 .account-toolbar .toolbar-search { flex: 1 1 220px; width: auto; }
 #accountVisitBtn { margin-left: auto; }
-.batch-bar {
-  display: flex; align-items: center; gap: 10px; margin: 0 0 14px;
-  padding: 8px 14px; border: 1px solid var(--brand-light);
-  border-radius: var(--radius-md); background: var(--brand-soft);
-  color: #92400e; font-size: 12px; font-weight: 600;
-  box-shadow: var(--shadow-xs);
+.filter-reset-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 999px;
+  background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  transition: all .15s ease;
 }
-.batch-bar #targetBatchCount { font-weight: 700; }
-.batch-bar #targetBatchRetry { margin-left: auto; }
-.batch-bar .btn-ghost { color: #92400e; }
+.filter-reset-btn:hover {
+  background: #fee2e2; color: #991b1b; border-color: #fca5a5;
+  transform: translateY(-1px);
+}
+
+/* Floating Batch Action Bar */
+.batch-bar.is-floating {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  background: rgba(15, 23, 42, 0.94);
+  color: #fff;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(10px);
+  animation: floatBarIn .2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes floatBarIn {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.batch-bar.is-floating[hidden] {
+  display: none !important;
+}
+.batch-bar.is-floating .batch-info {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700;
+}
+.batch-bar.is-floating .batch-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--brand); color: #fff; font-size: 12px;
+}
+.batch-bar.is-floating #targetBatchCount {
+  color: #fff; font-variant-numeric: tabular-nums;
+}
+.batch-bar.is-floating .batch-actions {
+  display: flex; align-items: center; gap: 8px;
+}
+.batch-bar.is-floating .btn-primary {
+  background: var(--brand); color: #fff; border: 0;
+  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.4);
+}
+.batch-bar.is-floating .btn-primary:hover {
+  background: var(--brand-dark);
+}
+.batch-bar.is-floating .btn-ghost {
+  color: #cbd5e1; background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.batch-bar.is-floating .btn-ghost:hover {
+  color: #fff; background: rgba(255, 255, 255, 0.1);
+}
 .pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 10px 16px; border-top: 1px solid var(--line); }
 .pager-info { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .pager-actions { display: flex; align-items: center; gap: 4px; }

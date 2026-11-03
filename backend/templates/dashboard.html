@@ -353,14 +353,27 @@
           <option value="no_followers">Tanpa followers</option>
           <option value="no_views">Tanpa views</option>
         </select>
+        <button type="button" id="targetFilterReset" class="btn btn-ghost btn-xs filter-reset-btn" hidden title="Kembalikan semua filter ke kondisi awal">Reset filter ✕</button>
       </div>
 
-      <p id="erInfo" class="table-note" role="note" hidden>ER (engagement rate) = (likes + komentar) ÷ followers untuk Instagram; (likes + komentar + share) ÷ views untuk TikTok.</p>
+      <div id="erInfo" class="popover er-popover" role="note" hidden>
+        <div class="popover-head">
+          <strong>Rumus Engagement Rate (ER)</strong>
+          <button type="button" class="popover-close" id="erInfoClose" aria-label="Tutup info">×</button>
+        </div>
+        <p><strong>Instagram:</strong> (likes + komentar) ÷ followers</p>
+        <p><strong>TikTok:</strong> (likes + komentar + share) ÷ views</p>
+      </div>
 
-      <div id="targetBatch" class="batch-bar" hidden>
-        <span id="targetBatchCount">0 dipilih</span>
-        <button type="button" id="targetBatchRetry" class="btn btn-secondary btn-sm">Ulangi terpilih</button>
-        <button type="button" id="targetBatchClear" class="btn btn-ghost btn-sm">Batal</button>
+      <div id="targetBatch" class="batch-bar is-floating" hidden>
+        <div class="batch-info">
+          <span class="batch-icon">✓</span>
+          <span id="targetBatchCount">0 dipilih</span>
+        </div>
+        <div class="batch-actions">
+          <button type="button" id="targetBatchRetry" class="btn btn-primary btn-sm">Ulangi terpilih</button>
+          <button type="button" id="targetBatchClear" class="btn btn-ghost btn-sm">Batal</button>
+        </div>
       </div>
 
       <div id="targetPanel" class="card" role="tabpanel" aria-labelledby="tabTargets">
@@ -529,18 +542,18 @@
         <label class="sr-only" for="accountLevel">Level risiko</label>
         <select id="accountLevel" class="control control-sm">
           <option value="">Semua level</option>
-          <option value="curiga">Semua yang dicurigai</option>
-          <option value="pola_kembar">Pola kembar</option>
-          <option value="pola_ternak">Pola ternak</option>
-          <option value="amati">Perlu diamati</option>
-          <option value="bersih">Bersih</option>
+          <option value="curiga">⚠️ Semua yang dicurigai</option>
+          <option value="pola_kembar">👯 Pola kembar</option>
+          <option value="pola_ternak">🚜 Pola ternak</option>
+          <option value="amati">👁️ Perlu diamati</option>
+          <option value="bersih">✓ Bersih</option>
         </select>
         <label class="sr-only" for="accountBand">Rentang followers</label>
         <select id="accountBand" class="control control-sm">
           <option value="">Semua ukuran</option>
-          <option value="ternak">Band ternak</option>
-          <option value="kecil">Di bawah band</option>
-          <option value="besar">Di atas band</option>
+          <option value="ternak">Band ternak (5k–25k)</option>
+          <option value="kecil">Di bawah band (&lt;5k)</option>
+          <option value="besar">Di atas band (&gt;25k)</option>
         </select>
         <label class="sr-only" for="accountPlatform">Platform</label>
         <select id="accountPlatform" class="control control-sm">
@@ -548,8 +561,22 @@
           <option value="instagram">Instagram</option>
           <option value="tiktok">TikTok</option>
         </select>
+        <button type="button" id="accountFilterReset" class="btn btn-ghost btn-xs filter-reset-btn" hidden title="Kembalikan semua filter ke kondisi awal">Reset filter ✕</button>
         <button type="button" id="accountVisitBtn" class="btn btn-secondary btn-sm"
-                title="Antrekan satu kunjungan profil untuk akun yang belum punya followers/bio">Ukur profil kosong</button>
+                title="Antrekan satu kunjungan profil untuk akun yang belum punya followers/bio">🎯 Ukur profil kosong</button>
+      </div>
+
+      <div id="reachInfo" class="popover reach-popover" role="note" hidden>
+        <div class="popover-head">
+          <strong>Penjelasan Metrik Reach</strong>
+          <button type="button" class="popover-close" id="reachInfoClose" aria-label="Tutup info">×</button>
+        </div>
+        <div class="popover-body">
+          <p><strong>Reach</strong> mengukur seberapa jauh unggahan terbaru menjangkau audiens:</p>
+          <p>• <strong>TikTok:</strong> median views ÷ followers</p>
+          <p>• <strong>Instagram:</strong> median likes ÷ followers</p>
+          <p class="popover-note">Akun ternak umumnya memiliki reach rendah di bawah 3% (TikTok) atau 1% (Instagram).</p>
+        </div>
       </div>
 
       <p id="accountSummary" class="panel-note" hidden></p>
@@ -612,8 +639,6 @@
         </div>
       </footer>
       </div>
-
-      <p id="reachInfo" class="table-note" role="note" hidden>Reach = unggahan terbaru dibagi audiens. TikTok memakai median views ÷ followers, Instagram memakai median likes ÷ followers. Akun ternak biasanya punya reach di bawah 3% (TikTok) atau 1% (Instagram).</p>
     </section>
 
     <section class="page" id="pageSearch" data-page="search" role="tabpanel" aria-labelledby="tabSearch" hidden>
