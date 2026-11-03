@@ -57,6 +57,9 @@
           <span id="streamPillText">Menghubungkan…</span>
         </span>
       </div>
+      <div class="status-right">
+        <span id="topbarAuditChip" class="topbar-audit-chip" title="Audit aktif">Memuat audit…</span>
+      </div>
     </div>
 
     <div id="dataToolbar" class="page-toolbar" hidden>
@@ -420,7 +423,7 @@
               <th scope="col" class="num sortable col-comments" aria-sort="none">
                 <button type="button" class="sort-btn" data-target-sort="comments">Komentar<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-views" aria-sort="none">
                 <button type="button" class="sort-btn" data-target-sort="views">Views<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
               <th scope="col" class="num sortable has-info col-er" aria-sort="none">
@@ -511,7 +514,7 @@
               <th scope="col" class="num sortable col-comments" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="comments">Komentar<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-views" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="views">Views<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
               <th scope="col" class="num sortable col-er" aria-sort="none">
@@ -616,7 +619,7 @@
               <th scope="col" class="num sortable col-followers" aria-sort="none">
                 <button type="button" class="sort-btn" data-account-sort="followers">Followers<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable has-info" aria-sort="none">
+              <th scope="col" class="num sortable has-info col-reach" aria-sort="none">
                 <button type="button" class="sort-btn" data-account-sort="reach">Reach<span class="sort-ind" aria-hidden="true">↕</span></button>
                 <button type="button" id="reachInfoBtn" class="info-btn" aria-expanded="false" aria-controls="reachInfo" aria-label="Penjelasan reach">i</button>
               </th>
@@ -629,7 +632,7 @@
               <th scope="col" class="sortable col-updated" aria-sort="none">
                 <button type="button" class="sort-btn" data-account-sort="age">Diperbarui<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-risk" aria-sort="none">
                 <button type="button" class="sort-btn" data-account-sort="risk">Risiko<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
             </tr>

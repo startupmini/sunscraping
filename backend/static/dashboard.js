@@ -19,6 +19,7 @@
     offlineRetry: document.getElementById('offlineRetry'),
     streamPill: document.getElementById('streamPill'),
     streamPillText: document.getElementById('streamPillText'),
+    topbarAuditChip: document.getElementById('topbarAuditChip'),
     openImportBtn: document.getElementById('openImportBtn'),
     openExportBtn: document.getElementById('openExportBtn'),
     openDatabaseBtn: document.getElementById('openDatabaseBtn'),
@@ -846,6 +847,21 @@
   function updateAuditMeta() {
     var audit = selectedAudit();
     var meta = el.auditMeta;
+
+    if (el.topbarAuditChip) {
+      if (!currentAuditId) {
+        el.topbarAuditChip.textContent = audits.length ? 'Semua audit (' + audits.length + ')' : 'Semua audit';
+        el.topbarAuditChip.title = audits.length ? audits.length + ' audit aktif' : 'Belum ada audit';
+      } else if (!audit) {
+        el.topbarAuditChip.textContent = 'Audit tidak ditemukan';
+        el.topbarAuditChip.title = '';
+      } else {
+        var topbarLabel = audit.name;
+        if (audit.period) topbarLabel += ' · ' + audit.period;
+        el.topbarAuditChip.textContent = topbarLabel;
+        el.topbarAuditChip.title = 'Audit aktif: ' + audit.name + (audit.period ? ' (' + audit.period + ')' : '') + ' · ' + formatNumber(audit.target_count) + ' target';
+      }
+    }
 
     if (!currentAuditId) {
       var totalTargets = auditTargetCount();
@@ -2578,7 +2594,7 @@
     tr.appendChild(metricValueCell(item.follower_count, missingReason(item, 'followers'), 'col-followers'));
     tr.appendChild(metricValueCell(item.likes, null, 'col-likes'));
     tr.appendChild(metricValueCell(item.comments, null, 'col-comments'));
-    tr.appendChild(metricValueCell(item.views));
+    tr.appendChild(metricValueCell(item.views, null, 'col-views'));
 
     var erTd = make('td', 'num er col-er');
     var targetErNode = make('span', 'metric-value', formatEr(item.engagement_rate));
@@ -2642,6 +2658,10 @@
       var ind = button.querySelector('.sort-ind');
       if (ind) ind.textContent = active ? (targetState.dir === 'asc' ? '↑' : '↓') : '↕';
     });
+    var targetTable = el.targetTableWrap ? el.targetTableWrap.querySelector('table') : null;
+    if (targetTable) {
+      targetTable.className = targetState.sort ? 'sort-' + targetState.sort : '';
+    }
   }
 
   // ---------- Account master list ----------
@@ -2907,7 +2927,7 @@
 
     tr.appendChild(metricValueCell(item.followers, null, 'col-followers'));
 
-    var reachTd = make('td', 'num er');
+    var reachTd = make('td', 'num er col-reach');
     var reach = pickReach(item);
     reachTd.appendChild(make('span', 'metric-value', formatPct(reach)));
     if (reach === null) {
@@ -2942,7 +2962,7 @@
     }
     tr.appendChild(dataTd);
 
-    var riskTd = make('td', 'num status-cell');
+    var riskTd = make('td', 'num status-cell col-risk');
     riskTd.appendChild(riskBadge(item));
     var primary = primaryFlag(item);
     var scoreSub = make('span', 'cell-sub',
@@ -2979,6 +2999,10 @@
       var ind = button.querySelector('.sort-ind');
       if (ind) ind.textContent = active ? (accountState.dir === 'asc' ? '↑' : '↓') : '↕';
     });
+    var accountTable = el.accountTableWrap ? el.accountTableWrap.querySelector('table') : null;
+    if (accountTable) {
+      accountTable.className = accountState.sort ? 'sort-' + accountState.sort : '';
+    }
   }
 
   function resetAccountFilters() {
@@ -3317,6 +3341,10 @@
       var ind = button.querySelector('.sort-ind');
       if (ind) ind.textContent = active ? (activitySort.dir === 'asc' ? '↑' : '↓') : '↕';
     });
+    var actTable = el.tableWrap ? el.tableWrap.querySelector('table') : null;
+    if (actTable) {
+      actTable.className = activitySort.key ? 'sort-' + activitySort.key : '';
+    }
   }
 
   // ---------- Latest table ----------
@@ -3386,7 +3414,7 @@
     tr.appendChild(metricValueCell(item.follower_count, missingReason(item, 'followers'), 'col-followers'));
     tr.appendChild(metricValueCell(item.likes, null, 'col-likes'));
     tr.appendChild(metricValueCell(item.comments, null, 'col-comments'));
-    tr.appendChild(metricValueCell(item.views));
+    tr.appendChild(metricValueCell(item.views, null, 'col-views'));
 
     var erTd = make('td', 'num er col-er');
     var er = calcEr(item.platform, item.likes, item.comments, item.views, item.shares, item.follower_count);
@@ -4523,17 +4551,64 @@
     }
   });
 
-  el.reachInfoBtn.addEventListener('click', function () {
-    var open = el.reachInfo.hidden;
-    el.reachInfo.hidden = !open;
-    el.reachInfoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    el.reachInfoBtn.classList.toggle('is-active', open);
-  });
-  if (el.reachInfoClose) {
-    el.reachInfoClose.addEventListener('click', function () {
+  function positionPopover(popover, anchorBtn) {
+    if (!popover || !anchorBtn) return;
+    var rect = anchorBtn.getBoundingClientRect();
+    var popWidth = popover.offsetWidth || 340;
+    var popHeight = popover.offsetHeight || 160;
+    var pad = 12;
+
+    var top = rect.bottom + 8;
+    var left = rect.left + (rect.width / 2) - (popWidth / 2);
+    if (left + popWidth > window.innerWidth - pad) {
+      left = window.innerWidth - popWidth - pad;
+    }
+    if (left < pad) {
+      left = pad;
+    }
+
+    if (top + popHeight > window.innerHeight - pad && rect.top > popHeight + pad) {
+      top = rect.top - popHeight - 8;
+    }
+
+    popover.style.top = Math.round(top) + 'px';
+    popover.style.left = Math.round(left) + 'px';
+  }
+
+  function closeAllPopovers() {
+    if (el.erInfo && !el.erInfo.hidden) {
+      el.erInfo.hidden = true;
+      if (el.erInfoBtn) {
+        el.erInfoBtn.setAttribute('aria-expanded', 'false');
+        el.erInfoBtn.classList.remove('is-active');
+      }
+    }
+    if (el.reachInfo && !el.reachInfo.hidden) {
       el.reachInfo.hidden = true;
-      el.reachInfoBtn.setAttribute('aria-expanded', 'false');
-      el.reachInfoBtn.classList.remove('is-active');
+      if (el.reachInfoBtn) {
+        el.reachInfoBtn.setAttribute('aria-expanded', 'false');
+        el.reachInfoBtn.classList.remove('is-active');
+      }
+    }
+  }
+
+  if (el.reachInfoBtn) {
+    el.reachInfoBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var willOpen = el.reachInfo ? el.reachInfo.hidden : false;
+      closeAllPopovers();
+      if (willOpen && el.reachInfo) {
+        el.reachInfo.hidden = false;
+        el.reachInfoBtn.setAttribute('aria-expanded', 'true');
+        el.reachInfoBtn.classList.add('is-active');
+        positionPopover(el.reachInfo, el.reachInfoBtn);
+      }
+    });
+  }
+  if (el.reachInfoClose) {
+    el.reachInfoClose.addEventListener('click', function (e) {
+      e.stopPropagation();
+      closeAllPopovers();
     });
   }
 
@@ -4550,19 +4625,47 @@
     el.workerNotice.hidden = true;
   });
 
-  el.erInfoBtn.addEventListener('click', function () {
-    var open = el.erInfo.hidden;
-    el.erInfo.hidden = !open;
-    el.erInfoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    el.erInfoBtn.classList.toggle('is-active', open);
-  });
-  if (el.erInfoClose) {
-    el.erInfoClose.addEventListener('click', function () {
-      el.erInfo.hidden = true;
-      el.erInfoBtn.setAttribute('aria-expanded', 'false');
-      el.erInfoBtn.classList.remove('is-active');
+  if (el.erInfoBtn) {
+    el.erInfoBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var willOpen = el.erInfo ? el.erInfo.hidden : false;
+      closeAllPopovers();
+      if (willOpen && el.erInfo) {
+        el.erInfo.hidden = false;
+        el.erInfoBtn.setAttribute('aria-expanded', 'true');
+        el.erInfoBtn.classList.add('is-active');
+        positionPopover(el.erInfo, el.erInfoBtn);
+      }
     });
   }
+  if (el.erInfoClose) {
+    el.erInfoClose.addEventListener('click', function (e) {
+      e.stopPropagation();
+      closeAllPopovers();
+    });
+  }
+
+  document.addEventListener('click', function (event) {
+    if (el.erInfo && !el.erInfo.hidden && !el.erInfo.contains(event.target) && event.target !== el.erInfoBtn) {
+      el.erInfo.hidden = true;
+      if (el.erInfoBtn) {
+        el.erInfoBtn.setAttribute('aria-expanded', 'false');
+        el.erInfoBtn.classList.remove('is-active');
+      }
+    }
+    if (el.reachInfo && !el.reachInfo.hidden && !el.reachInfo.contains(event.target) && event.target !== el.reachInfoBtn) {
+      el.reachInfo.hidden = true;
+      if (el.reachInfoBtn) {
+        el.reachInfoBtn.setAttribute('aria-expanded', 'false');
+        el.reachInfoBtn.classList.remove('is-active');
+      }
+    }
+  });
+
+  window.addEventListener('resize', function () {
+    if (el.erInfo && !el.erInfo.hidden) positionPopover(el.erInfo, el.erInfoBtn);
+    if (el.reachInfo && !el.reachInfo.hidden) positionPopover(el.reachInfo, el.reachInfoBtn);
+  });
 
   el.targetHead.addEventListener('click', function (event) {
     var button = event.target.closest('button[data-target-sort]');
@@ -4702,6 +4805,50 @@
     event.preventDefault();
     el.dbFileInput.click();
   });
+  ['dragenter', 'dragover'].forEach(function (name) {
+    el.dbDropzone.addEventListener(name, function (event) {
+      event.preventDefault();
+      el.dbDropzone.classList.add('is-dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (name) {
+    el.dbDropzone.addEventListener(name, function (event) {
+      event.preventDefault();
+      el.dbDropzone.classList.remove('is-dragover');
+    });
+  });
+  el.dbDropzone.addEventListener('drop', function (event) {
+    var files = event.dataTransfer && event.dataTransfer.files;
+    if (files && files.length) {
+      if (el.dbFileInput) el.dbFileInput.files = files;
+      setDbFile(files[0]);
+    }
+  });
+
+  var dbCard = el.databaseModal ? el.databaseModal.querySelector('.modal-card') : null;
+  if (dbCard && el.dbDropzone) {
+    ['dragenter', 'dragover'].forEach(function (name) {
+      dbCard.addEventListener(name, function (event) {
+        event.preventDefault();
+        el.dbDropzone.classList.add('is-dragover');
+      });
+    });
+    dbCard.addEventListener('dragleave', function (event) {
+      if (!dbCard.contains(event.relatedTarget)) {
+        el.dbDropzone.classList.remove('is-dragover');
+      }
+    });
+    dbCard.addEventListener('drop', function (event) {
+      event.preventDefault();
+      el.dbDropzone.classList.remove('is-dragover');
+      var files = event.dataTransfer && event.dataTransfer.files;
+      if (files && files.length) {
+        if (el.dbFileInput) el.dbFileInput.files = files;
+        setDbFile(files[0]);
+      }
+    });
+  }
+
   el.dbFileInput.addEventListener('change', function () {
     setDbFile(this.files && this.files[0]);
   });
@@ -4815,6 +4962,7 @@
     var modal = openModals();
     if (!modal) return;
     if (event.key === 'Escape') {
+      closeAllPopovers();
       if (modal === el.confirmModal) settleConfirm(false);
       else if (modal === el.importModal) closeImportModal();
       else if (modal === el.exportModal) closeExportModal();
@@ -4902,6 +5050,33 @@
       setFile(files[0]);
     }
   });
+
+  var importCard = el.importModal ? el.importModal.querySelector('.modal-card') : null;
+  if (importCard) {
+    ['dragenter', 'dragover'].forEach(function (name) {
+      importCard.addEventListener(name, function (event) {
+        event.preventDefault();
+        el.dropzone.classList.add('is-dragover');
+      });
+    });
+    importCard.addEventListener('dragleave', function (event) {
+      if (!importCard.contains(event.relatedTarget)) {
+        el.dropzone.classList.remove('is-dragover');
+      }
+    });
+    importCard.addEventListener('drop', function (event) {
+      event.preventDefault();
+      el.dropzone.classList.remove('is-dragover');
+      var files = event.dataTransfer && event.dataTransfer.files;
+      if (files && files.length) {
+        el.fileInput.files = files;
+        setFile(files[0]);
+      }
+    });
+  }
+
+  window.addEventListener('dragover', function (e) { e.preventDefault(); }, false);
+  window.addEventListener('drop', function (e) { e.preventDefault(); }, false);
 
   el.fileInput.addEventListener('change', function () {
     setFile(el.fileInput.files && el.fileInput.files[0]);
