@@ -33,8 +33,6 @@ social-auditor/                     # nama folder root dipertahankan — lihat c
 ├── launcher/                       # UI launcher (HTML/CSS/JS, tanpa dependency)
 ├── INSTALL_sunscraping.bat         # pasang sekali: Python + dependencies, lalu buka launcher
 ├── START_sunscraping.bat           # jalankan server manual, tanpa launcher
-├── sunscraping.hta                 # Control Panel lama (legacy; tidak dipakai launcher baru)
-├── run_hidden.bat                  # runner headless lama (dipanggil HTA)
 ├── README.md  .env.example  .gitignore
 ├── assets-src/
 │   └── icon.svg                    # master artwork logo
@@ -69,12 +67,19 @@ social-auditor/                     # nama folder root dipertahankan — lihat c
 │   └── utils/
 │       ├── rate-limiter.js         # Safety throttling engine
 │       └── task-cache.js           # Pakai ulang metrik dari kunjungan profil
+├── desktop/                        # aplikasi Electron (opsional; worker tanpa extension)
+├── tools/                          # bantuan pairing session/login browser
+│   ├── session-receiver.py         # simpan cookie dari session-bridge
+│   ├── cdp-session-cookies.js      # ekspor cookie via CDP
+│   └── session-bridge/             # ekstensi kecil pengirim cookie ke backend
 └── tests/
     ├── test_api_smoke.py           # Smoke test API dengan DB sementara
+    ├── test_dashboard_contract.py  # Kontrak header/baris ↔ payload API
+    ├── test_dashboard_accounts.py  # Kontrak tab Akun (markup ↔ script ↔ API)
     ├── test_account_intel.py       # Skoring akun ternak/kembar
     ├── test_account_profile.py     # Cache profil + seri bulanan
     ├── test_visit_budget.py        # Budget kunjungan & rerun murah
-    ├── test_dashboard_accounts.py  # Kontrak tab Akun (markup ↔ script ↔ API)
+    ├── test_profile_queue.py       # Antrean kunjungan profil
     ├── test_snapshot_migration.py  # Migrasi snapshot append-only
     ├── test_audit_fixes.py         # Regresi temuan audit
     └── js/                         # Tes engine: parseCount, cache, rate limiter, DOM
@@ -100,8 +105,7 @@ atau lewat browser + canvas) sebelum memuat ulang extension.
 
 Launcher mini berjalan di `127.0.0.1:5050` (bisa diubah dengan `SA_LAUNCHER_PORT`), memakai
 Python stdlib, dan membuka browser otomatis. Kalau backend sudah berjalan di luar launcher,
-panel hanya memantau dan tidak menghentikannya. `sunscraping.hta` adalah panel lama dan tidak
-dipakai oleh launcher ini.
+panel hanya memantau dan tidak menghentikannya.
 
 Semua launcher berjalan dari direktori project dan mencari `backend\app.py` secara absolut,
 jadi shortcut di desktop pun tetap bekerja setelah folder dipindah, selama nama folder induknya
