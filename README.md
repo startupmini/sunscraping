@@ -28,10 +28,13 @@
 
 ```
 social-auditor/                     # nama folder root dipertahankan — lihat catatan di bawah
-├── sunscraping.hta                 # Control Panel harian: start/stop, health, API key
-├── INSTALL_sunscraping.bat         # pasang sekali: Python + dependencies, lalu buka panel
-├── START_sunscraping.bat           # jalankan server manual, tanpa panel
-├── run_hidden.bat                  # runner headless yang dipanggil Control Panel
+├── START_launcher.bat              # launcher mini: start/stop, health, API key, log
+├── launcher.py                     # kontrol backend + server UI launcher
+├── launcher/                       # UI launcher (HTML/CSS/JS, tanpa dependency)
+├── INSTALL_sunscraping.bat         # pasang sekali: Python + dependencies, lalu buka launcher
+├── START_sunscraping.bat           # jalankan server manual, tanpa launcher
+├── sunscraping.hta                 # Control Panel lama (legacy; tidak dipakai launcher baru)
+├── run_hidden.bat                  # runner headless lama (dipanggil HTA)
 ├── README.md  .env.example  .gitignore
 ├── assets-src/
 │   └── icon.svg                    # master artwork logo
@@ -64,9 +67,17 @@ social-auditor/                     # nama folder root dipertahankan — lihat c
 │   │   ├── options.html            # Settings (pairing API key)
 │   │   └── options.js
 │   └── utils/
-│       └── rate-limiter.js         # Safety throttling engine
+│       ├── rate-limiter.js         # Safety throttling engine
+│       └── task-cache.js           # Pakai ulang metrik dari kunjungan profil
 └── tests/
-    └── test_api_smoke.py           # Smoke test API dengan DB sementara
+    ├── test_api_smoke.py           # Smoke test API dengan DB sementara
+    ├── test_account_intel.py       # Skoring akun ternak/kembar
+    ├── test_account_profile.py     # Cache profil + seri bulanan
+    ├── test_visit_budget.py        # Budget kunjungan & rerun murah
+    ├── test_dashboard_accounts.py  # Kontrak tab Akun (markup ↔ script ↔ API)
+    ├── test_snapshot_migration.py  # Migrasi snapshot append-only
+    ├── test_audit_fixes.py         # Regresi temuan audit
+    └── js/                         # Tes engine: parseCount, cache, rate limiter, DOM
 ```
 
 **Kenapa folder root masih `social-auditor`?** Nama itu sudah dipakai sebagai path absolut di
@@ -83,14 +94,22 @@ atau lewat browser + canvas) sebelum memuat ulang extension.
 
 | Kebutuhan | Pakai |
 |---|---|
-| Mesin baru / clone pertama, sekali saja | `INSTALL_sunscraping.bat` — pasang Python + dependencies lalu membuka Control Panel |
+| Mesin baru / clone pertama, sekali saja | `INSTALL_sunscraping.bat` — pasang Python + dependencies lalu membuka Launcher |
+| Kontrol harian: start, stop, restart, health, salin API key, log | `START_launcher.bat` |
 | Menyalakan server tanpa panel (mis. dari terminal) | `START_sunscraping.bat` |
-| Kontrol harian: start, stop, health, salin API key, buka dashboard | `sunscraping.hta` |
-| Menyalakan server tanpa jendela sama sekali | `run_hidden.bat` (dipanggil panel; bukan untuk diklik langsung) |
+
+Launcher mini berjalan di `127.0.0.1:5050` (bisa diubah dengan `SA_LAUNCHER_PORT`), memakai
+Python stdlib, dan membuka browser otomatis. Kalau backend sudah berjalan di luar launcher,
+panel hanya memantau dan tidak menghentikannya. `sunscraping.hta` adalah panel lama dan tidak
+dipakai oleh launcher ini.
 
 Semua launcher berjalan dari direktori project dan mencari `backend\app.py` secara absolut,
 jadi shortcut di desktop pun tetap bekerja setelah folder dipindah, selama nama folder induknya
 ikut berubah di shortcut tersebut.
+
+**Versi desktop (opsional).** `desktop/` berisi aplikasi Electron yang menjalankan backend sendiri
+dan melakukan scraping tanpa extension Chrome — lihat `desktop/README.md`. Jalankan **salah satu**
+worker saja (extension atau desktop): keduanya memakai antrean dan budget kunjungan yang sama.
 
 ## Quick Start
 
@@ -98,7 +117,7 @@ ikut berubah di shortcut tersebut.
 
 1. Double-click `INSTALL_sunscraping.bat`
 2. Script memasang Python (jika belum ada) + dependencies
-3. Control Panel terbuka otomatis
+3. Launcher terbuka otomatis
 
 ### Cara 2: Manual
 
@@ -115,7 +134,7 @@ python app.py
 ## Pairing Extension
 
 Backend membuat API key lokal otomatis saat pertama kali dijalankan (`backend/.api_key`).
-Key ditampilkan (disamarkan) di Control Panel dengan tombol **Salin**.
+Key ditampilkan (disamarkan) di Launcher dengan tombol **Salin**.
 
 1. Buka popup extension → **Settings**
 2. Isi **API Base** (`http://localhost:5000`) dan **API Key**
@@ -135,7 +154,7 @@ Dashboard memakai session cookie `HttpOnly` + `SameSite=Strict`, bukan API key d
 
 ## Alur Penggunaan
 
-1. **Mulai server** — Control Panel (`sunscraping.hta`) atau `START_sunscraping.bat`.
+1. **Mulai server** — Launcher (`START_launcher.bat`) atau `START_sunscraping.bat`.
 2. **Impor target** — Buka dashboard, unggah CSV/XLSX, isi **Nama audit** dan **Ulang (hari)** (0 = manual). Gunakan **Template CSV** atau centang **Tambahkan ke audit terpilih** untuk menggabungkan file ke audit yang sudah ada.
 3. **Mulai worker** — Klik ikon extension → **Mulai worker**; biarkan Chrome tetap terbuka.
 4. **Pantau** — Dashboard menampilkan antrean, snapshot terbaru, delta, dan status koneksi (Live/Polling).
@@ -148,7 +167,7 @@ Dashboard memakai session cookie `HttpOnly` + `SameSite=Strict`, bukan API key d
 
 | Kolom | Wajib | Deskripsi |
 |---|---|---|
-| `Link` / `URL` | ✅ | URL postingan Instagram/TikTok |
+| `Link` / `URL` | ✅ | URL **postingan**: Instagram `/p/`, `/reel/`, `/reels/`, `/tv/`; TikTok `/video/`, `/photo/`, `/t/`, atau short link `vm.`/`vt.` |
 | `Akun` / `User` | ❌ | Username akun (opsional, bisa terdeteksi dari halaman) |
 | `Tema` / `Title` | ❌ | Label/kategori kampanye |
 
@@ -165,6 +184,8 @@ audits        satu kampanye / daftar influencer (nama, repeat_days, last_run_at)
               └── snapshots   hasil tiap siklus + delta historis
 tasks         antrean kerja untuk worker
 accounts      cache follower (platform + username, TTL 7 hari)
+account_posts    unggahan terbaru per akun hasil kunjungan profil (12 jam)
+account_history  satu baris per akun per bulan (seri follower & unggahan)
 ```
 
 Dashboard menghitung KPI dari **run terakhir** setiap audit, sehingga angka tidak membengkak
@@ -175,12 +196,13 @@ ketika audit yang sama diperiksa berulang kali.
 | Environment Variable | Default | Deskripsi |
 |---|---|---|
 | `SA_API_KEY` | auto-generated | Override API key; jika kosong, key dibuat di `backend/.api_key` |
-| `SA_PORT` | `5000` | Port server backend (bind ke `127.0.0.1` saja); Control Panel membaca nilai ini otomatis, begitu juga daftar origin CORS — dan `chrome-extension/config.js` harus memakai port yang sama |
+| `SA_PORT` | `5000` | Port server backend (bind ke `127.0.0.1` saja); Launcher membaca nilai ini otomatis, begitu juga daftar origin CORS — dan `chrome-extension/config.js` harus memakai port yang sama |
+| `SA_LAUNCHER_PORT` | `5050` | Port panel launcher lokal; kalau dipakai proses lain, launcher mencari port berikutnya. Hanya mendengarkan di loopback. |
 | `SA_DB_PATH` | `backend/sunscraping.db` | Lokasi database SQLite |
 | `FLASK_DEBUG` | `false` | Debug mode (jangan dipakai untuk operasional) |
 
-`backend/.env.example` berisi salinan variabel yang sama, tapi backend tidak memuat `.env` secara
-otomatis — export di shell, atau set lewat `run_hidden.bat` / `START_sunscraping.bat`.
+`.env.example` di root project berisi salinan variabel yang sama, tapi backend tidak memuat `.env`
+secara otomatis — export di shell, atau set lewat `START_launcher.bat` / `START_sunscraping.bat`.
 
 State runtime tidak ikut version control dan aman dihapus kapan saja (server membuatnya ulang):
 `backend/runtime/` (log, upload, export), `backend/server.pid`, `backend/.api_key`, dan
@@ -192,10 +214,13 @@ session dashboard semua browser aktif terputus.
 | Method | Path | Auth | Deskripsi |
 |---|---|---|---|
 | `GET` | `/` | Session | Dashboard (session cookie HttpOnly) |
-| `GET` | `/api/health` | ❌ | Health check + ringkasan task |
+| `GET` | `/api/health` | ❌ | Health check; ringkasan task hanya bila `X-API-Key` atau sesi dashboard valid |
 | `GET` | `/api/auth/check` | ✅ | Validasi API key (Settings extension) |
 | `GET` | `/api/stats?audit_id=` | ✅ | Statistik, opsional per audit |
 | `GET` | `/api/latest?audit_id=&limit=` | ✅ | Snapshot terbaru per target |
+| `GET` | `/api/accounts?platform=&q=&band=&level=&sort=&dir=&limit=&offset=` | ✅ | Daftar akun + skor risiko, cluster, status refresh |
+| `GET` | `/api/accounts/<platform>/<username>` | ✅ | Detail akun: bukti, seri bulanan, unggahan, akun tertaut |
+| `POST` | `/api/account/profile` | ✅ | Simpan hasil kunjungan profil (fingerprint + post terbaru) |
 | `GET` | `/api/audits` | ✅ | Daftar audit + jumlah target/antrean |
 | `POST` | `/api/audits/<id>/rerun` | ✅ | Jadwalkan siklus baru |
 | `POST` | `/api/audits/<id>/retry-failed` | ✅ | Jadwalkan ulang target dengan hasil terakhir gagal |
@@ -250,27 +275,43 @@ Notifikasi Chrome ditampilkan saat pause, batas harian, atau circuit breaker akt
 
 ## Pengujian
 
-Smoke test API memakai database dan folder upload sementara, jadi tidak menyentuh data live:
+Semua tes Python memakai database dan folder upload sementara, jadi tidak menyentuh data live:
 
 ```bash
-python -m unittest tests.test_api_smoke -v
+# Sekali saja: pytest + dependensi backend
+python -m pip install -r requirements-dev.txt
+
+# Seluruh suite Python
+python -m pytest -q tests
+
+# Tes DOM di Chrome/Edge headless
+bun test tests/js
 ```
 
-Cakupan: health/auth, upload + append + deduplikasi, hasil OK/PARTIAL/FAILED, filter/sort/pagination
-target, retry gagal, heartbeat, dan export dengan filter status.
+`pytest` dipisah ke `requirements-dev.txt` supaya dependensi produksi di `backend/requirements.txt`
+tetap ramping. Tanpa pytest, suite yang sama masih bisa dijalankan lewat `python -m unittest`
+(daftar modulnya: `tests/test_*.py`).
+
+`tests/test_audit_fixes.py` menjaga temuan audit: link profil ditolak saat impor, hasil tanpa satu
+pun metrik tidak berstatus `OK`, `/api/health` tanpa key tidak membocorkan antrean, CSP terkirim,
+dan tiga konstanta yang dicerminkan backend ↔ extension (budget kunjungan, TTL cache post, batas
+post profil) tidak boleh menyimpang. Tes `tests/js/dom-*.test.mjs` menjalankan fixture di Chrome/Edge
+headless dan di-skip bila browsernya tidak ada.
 
 ## Troubleshooting
 
 | Gejala | Penyebab & Solusi |
 |---|---|
-| Control Panel "Offline" padahal server jalan | Port 5000 dipakai proses lain. Set `SA_PORT` sebelum membuka Control Panel; endpoint di panel mengikuti nilai tersebut. Sesuaikan API Base extension jika port berubah. |
-| Extension "API key ditolak" | Key di Settings berbeda dari `backend/.api_key`. Salin ulang dari Control Panel. |
+| Launcher "Offline" padahal server jalan | Port 5000 dipakai proses lain. Set `SA_PORT` sebelum membuka Launcher; endpoint di panel mengikuti nilai tersebut. Sesuaikan API Base extension jika port berubah. |
+| Extension "API key ditolak" | Key di Settings berbeda dari `backend/.api_key`. Salin ulang dari Launcher. |
 | Dashboard berstatus "Polling" | SSE terputus sementara; dashboard otomatis memakai polling 5 detik dan mencoba SSE lagi. |
 | Audit tidak berjalan otomatis | Isi **Ulang (hari)** > 0 atau klik **Audit ulang**. Penjadwalan otomatis hanya aktif saat antrean kosong. |
 | Task stuck di RUNNING | Task otomatis kembali ke PENDING setelah 5 menit (maks. 3 retry untuk error transient). |
 | Halaman minta login | Instagram/TikTok membatasi akses anonim. Login manual di Chrome, lalu lanjutkan worker. |
 | Upload gagal | Cek kolom `Link`, ukuran file (≤ 10 MB), dan maksimal 10.000 baris. |
 | Export kosong | Audit belum punya snapshot; jalankan worker sampai minimal satu target selesai. |
+| Impor menolak link | Hanya URL postingan yang diterima. Link profil (`instagram.com/akun`, `tiktok.com/@akun`) dihitung sebagai link tidak valid. |
+| Tab Akun terasa lambat | Skoring akun menghitung ulang seluruh korpus tiap request. Untuk korpus besar, arsipkan audit lama atau kurangi riwayat post. |
 
 ## Disclaimer
 
@@ -286,4 +327,4 @@ scraping data privat, atau pelanggaran privasi.
 
 ---
 
-*sunscraping v3.5 · Extension v1.4 — periodic campaign & influencer auditing, local only.*
+*sunscraping v3.5 · Extension v1.5 — periodic campaign & influencer auditing, local only.*

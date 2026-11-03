@@ -5,6 +5,8 @@ from flask import (
 )
 from flask_cors import CORS
 import pandas as pd
+import io
+import sqlite3
 import os
 import re
 import sys
@@ -17,6 +19,7 @@ import atexit
 import logging
 import secrets
 import uuid
+import zipfile
 from datetime import datetime, timezone
 from functools import wraps
 from urllib.parse import urlparse
@@ -86,7 +89,10 @@ if os.environ.get('SA_API_KEY', '').strip() and os.environ['SA_API_KEY'].strip()
 
 PORT = int(os.environ.get('SA_PORT', '5000'))
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # single ceiling for both the 413 handler and the size check
-ASSET_VERSION = '4'  # bump whenever dashboard.css/dashboard.js changes, so browsers drop the cache
+# A spreadsheet is a zip: MAX_CONTENT_LENGTH bounds the archive, not the XML it
+# unpacks into memory, so the unpacked size gets its own ceiling.
+MAX_UNCOMPRESSED_XLSX_BYTES = 200 * 1024 * 1024
+ASSET_VERSION = '32'  # bump whenever dashboard.css/dashboard.js changes, so browsers drop the cache
 
 app.config.update(
     SECRET_KEY=_load_or_create_file(SECRET_FILE, lambda: secrets.token_hex(32)),
@@ -115,12 +121,22 @@ MAX_ROWS = 10000
 RUNTIME_FOLDER = os.path.join(BASE_DIR, 'runtime')
 UPLOAD_FOLDER = os.path.join(RUNTIME_FOLDER, 'uploads')
 EXPORT_FOLDER = os.path.join(UPLOAD_FOLDER, 'exports')
+BACKUP_FOLDER = os.path.join(RUNTIME_FOLDER, 'backups')
 os.makedirs(EXPORT_FOLDER, exist_ok=True)
+os.makedirs(BACKUP_FOLDER, exist_ok=True)
+
+# A restore replaces every table, so the file must look like a sunscraping DB.
+BACKUP_EXTENSIONS = ('.db', '.sqlite', '.sqlite3', '.backup')
+BACKUP_KEEP = 10
 
 INSTAGRAM_HOSTS = {'instagram.com', 'www.instagram.com', 'm.instagram.com'}
 TIKTOK_HOSTS = {
     'tiktok.com', 'www.tiktok.com', 'm.tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com',
 }
+# Short links carry an opaque code until the browser follows the redirect, so
+# their path cannot be checked for a post segment.
+TIKTOK_SHORT_HOSTS = {'vm.tiktok.com', 'vt.tiktok.com'}
+INSTAGRAM_POST_SEGMENTS = ('p', 'reel', 'reels', 'tv')
 
 URL_HEADER_HINTS = ('link', 'url', 'tautan', 'postingan')
 USER_HEADER_HINTS = ('username', 'user name', 'akun', 'account', 'user')
@@ -148,12 +164,28 @@ def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
+    # The dashboard is plain ES5 with no build step: its only script source is
+    # /static/dashboard.js. blob: stays allowed because the CSV template and the
+    # Excel download both hand the browser a blob URL.
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self' blob:; script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; "
+        "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
+        "form-action 'self'"
+    )
     return response
 
 
 def _has_valid_api_key():
     key = request.headers.get('X-API-Key', '')
-    return bool(key) and secrets.compare_digest(key, API_KEY)
+    if not key:
+        return False
+    # compare_digest rejects non-ASCII str; a key with accents is not a match
+    # anyway, but it must answer 401 instead of raising TypeError -> 500.
+    try:
+        return secrets.compare_digest(key.encode('utf-8'), API_KEY.encode('utf-8'))
+    except (UnicodeError, AttributeError):
+        return False
 
 
 # In-memory heartbeat: updated whenever the extension talks to the task API.
@@ -166,7 +198,19 @@ def _touch_worker():
     ).replace('+00:00', 'Z')
 
 
+# Reclaiming stale RUNNING tasks is a write transaction, and the popup polls
+# /api/stats every few seconds while the worker claims tasks with its own write
+# transaction. A stale claim only matters after database.TASK_LOCK_MINUTES, so
+# running the sweep at most every 30 seconds keeps both sides off the writer.
+RECLAIM_MIN_INTERVAL_SECONDS = 30
+_RECLAIM_STATE = {'last': 0.0}
+
+
 def _stats_payload(audit_id=None, reclaim=True):
+    if reclaim and time.time() - _RECLAIM_STATE['last'] < RECLAIM_MIN_INTERVAL_SECONDS:
+        reclaim = False
+    if reclaim:
+        _RECLAIM_STATE['last'] = time.time()
     stats = database.get_dashboard_stats(audit_id=audit_id, reclaim=reclaim)
     stats['WORKER_LAST_SEEN'] = WORKER_LAST_SEEN['ts']
     return stats
@@ -182,8 +226,47 @@ def require_api_key(f):
     return decorated
 
 
+def _looks_like_post(platform, parsed):
+    """Only a post page has metrics; a profile link never does.
+
+    Profile URLs used to pass host validation and then produce an empty row the
+    dashboard counted as finished, so the path decides now: /p/, /reel/, /tv/ on
+    Instagram and /video/, /photo/ (or a short link) on TikTok.
+    """
+    segments = [segment for segment in (parsed.path or '').split('/') if segment]
+    if not segments:
+        return False
+
+    if platform == 'instagram':
+        return len(segments) >= 2 and segments[0].lower() in INSTAGRAM_POST_SEGMENTS
+
+    host = (parsed.hostname or '').lower()
+    if host in TIKTOK_SHORT_HOSTS:
+        return True
+
+    head = segments[0].lower()
+    if head in ('t', 'v') and len(segments) >= 2:
+        return True
+    return (
+        len(segments) >= 3
+        and head.startswith('@')
+        and segments[1].lower() in ('video', 'photo')
+    )
+
+
+def _xlsx_expands_too_far(path):
+    """True when the archived sheet unpacks past the ceiling (zip bomb)."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            unpacked = sum(entry.file_size for entry in archive.infolist())
+    except (zipfile.BadZipFile, OSError, ValueError):
+        # Let pandas report an unreadable file with its own message.
+        return False
+    return unpacked > MAX_UNCOMPRESSED_XLSX_BYTES
+
+
 def normalize_target_url(raw):
-    """Return (platform, canonical_url) for allowed Instagram/TikTok hosts."""
+    """Return (platform, canonical_url) for a post on an allowed host."""
     if raw is None:
         return None
     value = str(raw).strip()
@@ -210,6 +293,8 @@ def normalize_target_url(raw):
     elif host in TIKTOK_HOSTS:
         platform = 'tiktok'
     else:
+        return None
+    if not _looks_like_post(platform, parsed):
         return None
 
     canonical = parsed._replace(scheme='https', fragment='').geturl()
@@ -320,7 +405,12 @@ database.init_db()
 @app.route('/')
 def index():
     session['dashboard'] = True
-    return render_template('dashboard.html', asset_version=ASSET_VERSION)
+    return render_template(
+        'dashboard.html',
+        asset_version=ASSET_VERSION,
+        max_rows=f"{MAX_ROWS:,}".replace(",", "."),
+        max_upload_mb=MAX_UPLOAD_BYTES // (1024 * 1024),
+    )
 
 # ==========================================
 # API ENDPOINTS
@@ -331,6 +421,35 @@ def index():
 def get_stats():
     audit_id = _parse_int_arg(request.args.get('audit_id'))
     return jsonify(_stats_payload(audit_id=audit_id))
+
+@app.route('/api/summary', methods=['GET'])
+@require_api_key
+def get_summary():
+    """Recap payload: totals, medians, top posts and per-account rollups."""
+    audit_id = _parse_int_arg(request.args.get('audit_id'))
+    return jsonify(database.get_summary(audit_id=audit_id))
+
+
+@app.route('/api/compare', methods=['GET'])
+@require_api_key
+def compare_periods():
+    """Accounts by month, for the monthly campaign review."""
+    months = _parse_int_arg(request.args.get('months')) or 6
+    return jsonify(database.get_compare(
+        months=months,
+        period=database.clean_period(request.args.get('period')),
+    ))
+
+
+@app.route('/api/search', methods=['GET'])
+@require_api_key
+def search_data():
+    """Manual lookup across targets, accounts and stored posts."""
+    return jsonify(database.search_data(
+        request.args.get('q'),
+        limit=_parse_int_arg(request.args.get('limit')) or 20,
+    ))
+
 
 @app.route('/api/clear', methods=['POST'])
 @require_api_key
@@ -349,7 +468,9 @@ def list_audits():
 @app.route('/api/audits/<int:audit_id>/rerun', methods=['POST'])
 @require_api_key
 def rerun_audit(audit_id):
-    result = database.enqueue_run(audit_id, trigger='manual')
+    body = request.get_json(silent=True) or {}
+    full = bool(body.get('full') or request.args.get('full') == '1')
+    result = database.enqueue_run(audit_id, trigger='manual', full=full)
     if result is None:
         return jsonify({"error": "Audit tidak ditemukan."}), 404
     if result.get('pending'):
@@ -366,8 +487,75 @@ def rerun_audit(audit_id):
             "empty": True,
             "message": "Audit ini belum memiliki target.",
         })
-    logger.info(f"Re-audit queued: {result['created']} targets for audit {audit_id}")
-    return jsonify({"success": True, **result, "message": f"{result['created']} target dijadwalkan ulang."})
+    skipped = result.get('skipped_verified', 0)
+    logger.info(
+        f"Re-audit queued: {result['created']} targets for audit {audit_id} "
+        f"({skipped} verified skipped, full={full})"
+    )
+    message = f"{result['created']} target dijadwalkan ulang."
+    if skipped:
+        message += f" {skipped} target yang sudah punya angka dilewati."
+    return jsonify({"success": True, **result, "message": message})
+
+
+@app.route('/api/accounts/visit', methods=['POST'])
+@require_api_key
+def queue_profile_visits():
+    """Queue one profile visit per account that has no stored fingerprint yet."""
+    body = request.get_json(silent=True) or {}
+    audit_id = _parse_int_arg(body.get('audit_id') or request.args.get('audit_id'))
+    if not audit_id:
+        return jsonify({"error": "audit_id wajib diisi."}), 400
+    only_missing = body.get('only_missing')
+    if only_missing is None:
+        only_missing = request.args.get('only_missing') != '0'
+    result = database.enqueue_profile_visits(audit_id, only_missing=bool(only_missing))
+    if result is None:
+        return jsonify({"error": "Audit tidak ditemukan."}), 404
+    if result.get('pending'):
+        return jsonify({
+            "success": True,
+            **result,
+            "message": "Sudah ada kunjungan profil yang menunggu; tugas post boleh tetap berjalan.",
+        })
+    if not result.get('created'):
+        return jsonify({
+            "success": True,
+            **result,
+            "message": "Semua akun yang punya handle sudah pernah diukur.",
+        })
+    logger.info(f"Profile visits queued: {result['created']} accounts for audit {audit_id}")
+    return jsonify({
+        "success": True,
+        **result,
+        "message": f"{result['created']} kunjungan profil dijadwalkan.",
+    })
+
+
+@app.route('/api/targets/retry', methods=['POST'])
+@require_api_key
+def retry_selected_targets():
+    """Queue new visits for rows the user selected in the target table."""
+    body = request.get_json(silent=True) or {}
+    audit_id = _parse_int_arg(body.get('audit_id'))
+    target_ids = body.get('target_ids')
+    if not audit_id:
+        return jsonify({'error': 'audit_id wajib diisi.'}), 400
+    if not isinstance(target_ids, list) or not target_ids:
+        return jsonify({'error': 'target_ids harus berisi minimal satu id.'}), 400
+    result = database.retry_targets(audit_id, target_ids)
+    if result is None:
+        return jsonify({'error': 'Audit tidak ditemukan.'}), 404
+    message = f"{result['created']} target dijadwalkan ulang."
+    if result['skipped_running']:
+        message += f" {result['skipped_running']} target masih berjalan dan dilewati."
+    if result['missing']:
+        message += f" {result['missing']} id tidak ditemukan pada audit ini."
+    logger.info(
+        f"Selected retry: {result['created']} targets for audit {audit_id} "
+        f"({result['skipped_running']} running, {result['missing']} missing)"
+    )
+    return jsonify({'success': True, **result, 'message': message})
 
 
 @app.route('/api/audits/<int:audit_id>/retry-failed', methods=['POST'])
@@ -376,17 +564,23 @@ def retry_failed(audit_id):
     result = database.retry_failed_targets(audit_id)
     if result is None:
         return jsonify({"error": "Audit tidak ditemukan."}), 404
+    skipped = result.get('skipped_permanent', 0)
+    note = f" {skipped} target gagal permanen dilewati." if skipped else ""
     if result['created'] == 0:
         return jsonify({
             "success": True,
-            "created": 0,
-            "message": "Tidak ada target gagal yang bisa diulang.",
+            **result,
+            "message": ("Semua target gagal bersifat permanen (postingan hilang/tautan salah); tidak perlu diulang."
+                        if skipped else "Tidak ada target gagal yang bisa diulang."),
         })
-    logger.info(f"Retry queued: {result['created']} failed targets for audit {audit_id}")
+    logger.info(
+        f"Retry queued: {result['created']} failed targets for audit {audit_id} "
+        f"({skipped} permanent skipped)"
+    )
     return jsonify({
         "success": True,
         **result,
-        "message": f"{result['created']} target gagal dijadwalkan ulang.",
+        "message": f"{result['created']} target gagal dijadwalkan ulang.{note}",
     })
 
 
@@ -401,7 +595,10 @@ def update_audit_settings(audit_id):
         if clamped is None:
             return jsonify({"error": "repeat_days harus angka 0-365."}), 400
         repeat_days = clamped
-    audit = database.update_audit(audit_id, name=name, repeat_days=repeat_days)
+    period = data.get('period')
+    if period is not None and database.clean_period(period) is None:
+        return jsonify({"error": "period harus format YYYY-MM."}), 400
+    audit = database.update_audit(audit_id, name=name, repeat_days=repeat_days, period=period)
     if not audit:
         return jsonify({"error": "Audit tidak ditemukan."}), 404
     return jsonify({"success": True, "audit": audit})
@@ -470,6 +667,27 @@ def dashboard_events():
         },
     )
 
+def _username_from_post_url(platform, url):
+    """Most post URLs carry the handle; a sheet with only links still gets one.
+
+    Instagram uses /{user}/p/{code}/ as well as /p/{code}/, TikTok always uses
+    /@user/video/{id}. Anything else returns None instead of guessing.
+    """
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return None
+    segments = [part for part in (parsed.path or '').split('/') if part]
+    if platform == 'instagram' and len(segments) >= 3:
+        if segments[1].lower() in INSTAGRAM_POST_SEGMENTS:
+            return database.clean_username(segments[0])
+        return None
+    if platform == 'tiktok':
+        if segments and segments[0].startswith('@'):
+            return database.clean_username(segments[0][1:])
+    return None
+
+
 def _parse_upload_rows(df):
     """Read a target sheet into task dicts plus the counts the response reports.
 
@@ -502,9 +720,13 @@ def _parse_upload_rows(df):
             continue
 
         platform, url = target
-        username = _cell_text(row.get(username_column)) if username_column else None
-        if username:
-            username = username.lstrip('@').strip() or None
+        username = database.clean_username(_cell_text(row.get(username_column))) if username_column else None
+        # The link is evidence, the sheet column is a claim. When the URL already
+        # names its owner that name wins, so @name and the opened post can never
+        # describe two different accounts.
+        url_username = _username_from_post_url(platform, url)
+        if url_username:
+            username = url_username
         tema = _cell_text(row.get(tema_column)) if tema_column else None
 
         tasks.append({
@@ -570,6 +792,13 @@ def upload_file():
     uploaded.save(filepath)
 
     try:
+        # Checked before pandas opens it: the ceiling bounds the archive, not the
+        # XML it unpacks, so the archive is inspected first.
+        if extension == '.xlsx' and _xlsx_expands_too_far(filepath):
+            return jsonify({
+                "error": "File Excel terlalu besar saat dibuka. Pecah file menjadi beberapa bagian."
+            }), 400
+
         df = _read_dataframe(filepath, extension)
         if len(df.columns) == 0:
             return jsonify({"error": "File tidak berisi kolom yang bisa dibaca."}), 400
@@ -587,8 +816,13 @@ def upload_file():
         audit_name = (request.form.get('audit_name') or '').strip()
         if not audit_name:
             audit_name = os.path.splitext(safe_name)[0].replace('_', ' ').strip() or 'Audit baru'
-        clamped = database.parse_repeat_days(request.form.get('repeat_days'))
+        repeat_field = (request.form.get('repeat_days') or '').strip()
+        clamped = database.parse_repeat_days(repeat_field)
+        if repeat_field and clamped is None:
+            # A typo used to be stored as "manual"; say so instead of guessing.
+            return jsonify({"error": "repeat_days harus angka 0-365."}), 400
         repeat_days = 0 if clamped is None else clamped
+        period = database.clean_period(request.form.get('period'))
 
         append_audit_id = _parse_int_arg(request.form.get('audit_id'))
 
@@ -611,7 +845,7 @@ def upload_file():
                     f"Semua {summary['duplicates']} link sudah ada di audit ini."
                     if summary['duplicates'] else
                     f"Tidak ada target valid. {empty_rows} baris kosong, "
-                    f"{invalid_urls} link bukan Instagram/TikTok."
+                    f"{invalid_urls} link bukan halaman postingan Instagram/TikTok."
                 )
                 return jsonify({"error": reason, **summary}), 400
 
@@ -627,6 +861,7 @@ def upload_file():
             name=audit_name,
             repeat_days=repeat_days,
             source_filename=safe_name,
+            period=period,
         )
         summary = _upload_summary(parsed, result, audit_name, repeat_days, False)
 
@@ -638,7 +873,7 @@ def upload_file():
                 f"Semua {summary['duplicates']} link duplikat di dalam file."
                 if summary['duplicates'] else
                 f"Tidak ada task valid. {empty_rows} baris kosong, "
-                f"{invalid_urls} link bukan Instagram/TikTok."
+                f"{invalid_urls} link bukan halaman postingan Instagram/TikTok."
             )
             return jsonify({"error": reason, **summary}), 400
 
@@ -676,6 +911,10 @@ def get_task():
     if task.get('username'):
         follower_cache = database.get_account_cache(task['username'], task.get('platform'))
 
+    # A profile visit may already have measured this exact post; handing the
+    # numbers to the worker saves the navigation entirely.
+    cached_post = database.get_cached_post_metrics(task['url'], task.get('platform'))
+
     return jsonify({
         "hasTask": True,
         "task": {
@@ -687,7 +926,8 @@ def get_task():
             "auditId": task.get('audit_id'),
             "runId": task.get('run_id'),
             "targetId": task.get('target_id'),
-            "cachedFollowerCount": follower_cache
+            "cachedFollowerCount": follower_cache,
+            "cachedPost": cached_post,
         }
     })
 
@@ -703,8 +943,35 @@ def submit_result():
         return jsonify({"error": "Invalid payload"}), 400
 
     if not database.update_task_result(task_id, result):
-        return jsonify({"error": "Task not found"}), 404
+        return jsonify({"error": "Task tidak ditemukan atau sudah selesai."}), 404
     return jsonify({"success": True})
+
+
+@app.route('/api/account/profile', methods=['POST'])
+@require_api_key
+def save_account_profile():
+    """One profile visit: account fingerprint plus its most recent posts."""
+    _touch_worker()
+    payload = request.get_json(silent=True) or {}
+    result = database.record_account_profile(payload)
+    if result is None:
+        return jsonify({"error": "Profil tidak valid: platform dan username wajib diisi."}), 400
+    logger.info(
+        f"Profile stored: {result['platform']}@{result['username']} "
+        f"({result['posts_stored']} posts)"
+    )
+    return jsonify({"success": True, **result})
+
+
+@app.route('/api/account/profile', methods=['GET'])
+@require_api_key
+def read_account_profile():
+    platform = request.args.get('platform')
+    username = request.args.get('username')
+    account = database.get_account_profile(username, platform)
+    if account is None:
+        return jsonify({"error": "Akun belum pernah discrape."}), 404
+    return jsonify(account)
 
 @app.route('/api/latest', methods=['GET'])
 @require_api_key
@@ -722,23 +989,66 @@ def list_targets():
         status=(request.args.get('status') or '').strip() or None,
         platform=(request.args.get('platform') or '').strip() or None,
         query=(request.args.get('q') or '').strip() or None,
+        issue=(request.args.get('issue') or '').strip() or None,
         sort=(request.args.get('sort') or 'recent').strip(),
         direction=(request.args.get('dir') or 'desc').strip(),
         limit=_parse_int_arg(request.args.get('limit')) or 50,
         offset=_parse_int_arg(request.args.get('offset')) or 0,
     ))
 
+@app.route('/api/accounts', methods=['GET'])
+@require_api_key
+def list_accounts():
+    """Account master list: what we already know, what needs a visit, and which
+    accounts look farmed — with the thresholds the verdict used."""
+    result = database.get_account_intel(
+        platform=(request.args.get('platform') or '').strip() or None,
+        query=(request.args.get('q') or '').strip() or None,
+        band=(request.args.get('band') or '').strip() or None,
+        level=(request.args.get('level') or '').strip() or None,
+        sort=(request.args.get('sort') or 'risk').strip(),
+        direction=(request.args.get('dir') or 'desc').strip(),
+        limit=_parse_int_arg(request.args.get('limit')) or 50,
+        offset=_parse_int_arg(request.args.get('offset')) or 0,
+    )
+    result['thresholds'] = {
+        'band': [database.TERNAK_BAND_MIN, database.TERNAK_BAND_MAX],
+        'view_reach_floor': database.VIEW_REACH_FLOOR,
+        'like_reach_floor': database.IG_LIKE_REACH_FLOOR,
+        'upload_burst': [database.UPLOAD_BURST_MIN_COUNT, database.UPLOAD_BURST_WINDOW_MINUTES],
+        'flat_follower_tolerance': database.FLAT_FOLLOWER_TOLERANCE * 100,
+        'cache_ttl_minutes': database.CACHE_TTL_MINUTES,
+        'levels': dict(database.RISK_FLOORS),
+    }
+    return jsonify(result)
+
+
+@app.route('/api/accounts/<platform>/<username>', methods=['GET'])
+@require_api_key
+def account_detail(platform, username):
+    detail = database.get_account_detail(username, platform=(platform or '').strip() or None)
+    if not detail:
+        return jsonify({'success': False, 'error': 'Akun belum pernah disimpan.'}), 404
+    return jsonify({'success': True, 'account': detail})
+
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    """Health check endpoint for launcher/monitoring."""
-    stats = _stats_payload(reclaim=False)
-    return jsonify({
+    """Health check for the launcher and the extension popup.
+
+    An unauthenticated probe only learns that the server is up: queue counts are
+    business data, so they are served to a paired caller (Control Panel and the
+    extension both hold the key) instead of anyone who can reach loopback.
+    """
+    payload = {
         "status": "healthy",
         "pid": os.getpid(),
         "version": "3.5.0",
-        "tasks": stats,
-        "audits": len(database.get_audits()),
-    })
+    }
+    if _has_valid_api_key() or session.get('dashboard'):
+        payload['tasks'] = _stats_payload(reclaim=False)
+        payload['audits'] = len(database.get_audits())
+    return jsonify(payload)
 
 
 @app.route('/api/auth/check', methods=['GET'])
@@ -794,6 +1104,89 @@ def _difference(current, previous):
     return round(current_value - previous_value, 2)
 
 
+def _recap_rows(audit_id=None):
+    """Rows for the "Rekap" sheet: the numbers a reader would otherwise total
+    by hand in Excel, in one tidy block per section."""
+    summary = database.get_summary(audit_id=audit_id)
+    kpi = summary['kpi']
+    rows = []
+
+    def add(section, label, value, note=''):
+        rows.append({'Bagian': section, 'Label': label, 'Nilai': value, 'Keterangan': note})
+
+    label = summary['audits'][0]['name'] if audit_id and summary['audits'] else 'Semua audit'
+    add('Ringkasan', 'Audit', label)
+    add('Ringkasan', 'Target', kpi['targets'])
+    add('Ringkasan', 'Sudah diproses', kpi['scraped'])
+    add('Ringkasan', 'Terverifikasi (OK + sebagian)', kpi['verified'])
+    add('Ringkasan', 'Tingkat keberhasilan (%)', kpi['success_rate'],
+        'terverifikasi / sudah diproses')
+    add('Ringkasan', 'Gagal', kpi['failed'])
+    add('Ringkasan', 'Menunggu / berjalan', kpi['pending'] + kpi['running'])
+    add('Ringkasan', 'Akun unik', kpi['accounts'])
+    add('Ringkasan', 'Total views', kpi['totals']['views'])
+    add('Ringkasan', 'Total likes', kpi['totals']['likes'])
+    add('Ringkasan', 'Total komentar', kpi['totals']['comments'])
+    add('Ringkasan', 'Total share', kpi['totals']['shares'])
+    add('Ringkasan', 'Data pertama', kpi['first_scraped_at'] or '—')
+    add('Ringkasan', 'Data terakhir', kpi['last_scraped_at'] or '—')
+
+    for item in summary['platforms']:
+        platform = item['platform']
+        add(f'Platform {platform}', 'Target', item['targets'])
+        add(f'Platform {platform}', 'Sudah diproses', item['scraped'])
+        add(f'Platform {platform}', 'Terverifikasi', item['ok'] + item['partial'])
+        add(f'Platform {platform}', 'Views', item['views'])
+        add(f'Platform {platform}', 'Likes', item['likes'])
+        add(f'Platform {platform}', 'Komentar', item['comments'])
+        add(f'Platform {platform}', 'Share', item['shares'])
+        add(f'Platform {platform}', 'Median ER (%)', item['median_er'],
+            f"dari {item['er_rows']} postingan")
+
+    for item in summary['accounts']:
+        handle = item['username'] or item['handle']
+        add('Akun', f"@{handle}" if item['username'] else handle, item['views'],
+            f"{item['platform']} · {item['posts']} postingan · "
+            f"median ER {item['median_er'] if item['median_er'] is not None else '—'}%")
+
+    quality = summary['quality']
+    add('Kualitas data', 'Akun tanpa followers', quality['without_followers'],
+        'ER Instagram tidak bisa dihitung untuk akun ini')
+    add('Kualitas data', 'Akun sebagian terbaca (PARTIAL)', quality['partial'])
+    add('Kualitas data', 'Akun TikTok tanpa views', quality['missing_views'],
+        'Instagram tidak menampilkan views, jadi tidak dihitung sebagai celah')
+    add('Kualitas data', 'Akun tanpa handle', quality['missing_username'])
+    add('Kualitas data', 'Akun belum pernah diproses', quality['never_scraped'])
+    add('Kualitas data', 'Dasar hitung kelengkapan', 'per akun, bukan per tautan')
+
+    add('Catatan', 'Rumus ER Instagram', '(likes + komentar) / followers × 100')
+    add('Catatan', 'Rumus ER TikTok', '(likes + komentar + share) / views × 100')
+    add('Catatan', 'Pembulatan platform',
+        'Views/likes dari platform sudah dibulatkan (mis. 17,6M), jadi ER memakai nilai bulat itu')
+    add('Catatan', 'Median, bukan rata-rata',
+        'Median dipakai agar satu postingan viral tidak menggeser seluruh angka')
+    return rows
+
+
+def _style_export_sheet(sheet, frame, freeze='A2', autofilter=False):
+    """Header colour, frozen header row and readable widths."""
+    from openpyxl.styles import Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    header_font = Font(bold=True, color='FFFFFF')
+    header_fill = PatternFill('solid', fgColor='1D4ED8')
+    for cell in sheet[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+    sheet.freeze_panes = freeze
+    if autofilter:
+        sheet.auto_filter.ref = sheet.dimensions
+    for index, column in enumerate(frame.columns, start=1):
+        values = [str(value) for value in frame[column].head(200)]
+        longest = max([len(str(column))] + [len(value) for value in values])
+        sheet.column_dimensions[get_column_letter(index)].width = min(48, max(10, longest + 2))
+
+
 @app.route('/api/export', methods=['GET'])
 @require_api_key
 def export_excel():
@@ -838,7 +1231,7 @@ def export_excel():
     )
 
     columns = [
-        'audit_name', 'run_id', 'platform', 'tema', 'url', 'username',
+        'period', 'audit_name', 'run_id', 'platform', 'tema', 'url', 'username',
         'follower_count', 'likes', 'comments', 'views', 'shares',
         'engagement_rate_%', 'prev_likes', 'prev_comments', 'prev_views',
         'prev_follower_count', 'prev_engagement_rate_%', 'delta_likes',
@@ -856,7 +1249,14 @@ def export_excel():
     _cleanup_old_exports()
     export_path = os.path.join(EXPORT_FOLDER, f"sunscraping_export_{uuid.uuid4().hex}.xlsx")
     try:
-        df.to_excel(export_path, index=False)
+        recap = pd.DataFrame(_recap_rows(audit_id))
+        with pd.ExcelWriter(export_path, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Data')
+            if not recap.empty:
+                recap.to_excel(writer, index=False, sheet_name='Rekap')
+            _style_export_sheet(writer.sheets['Data'], df, autofilter=True)
+            if 'Rekap' in writer.sheets:
+                _style_export_sheet(writer.sheets['Rekap'], recap)
     except Exception as exc:
         logger.error(f"Export error: {exc}", exc_info=True)
         return jsonify({
@@ -876,6 +1276,129 @@ def export_excel():
         as_attachment=True,
         download_name=filename,
     )
+
+def _prune_safety_backups(keep=BACKUP_KEEP):
+    """Keep the newest pre-restore copies and drop the rest."""
+    try:
+        names = [
+            name for name in os.listdir(BACKUP_FOLDER)
+            if name.startswith('pre_restore_') and name.endswith('.db')
+        ]
+    except OSError:
+        return
+    paths = [os.path.join(BACKUP_FOLDER, name) for name in names]
+    paths.sort(key=lambda item: os.path.getmtime(item), reverse=True)
+    for path in paths[keep:]:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+@app.route('/api/database/info', methods=['GET'])
+@require_api_key
+def database_info():
+    return jsonify(database.get_database_info())
+
+
+@app.route('/api/database/export', methods=['GET'])
+@require_api_key
+def export_database():
+    """Download one consistent .db file containing every table."""
+    temp_path = os.path.join(EXPORT_FOLDER, f'db_export_{uuid.uuid4().hex}.db')
+    try:
+        database.backup_database(temp_path)
+        with open(temp_path, 'rb') as handle:
+            payload = handle.read()
+    except (OSError, sqlite3.Error) as exc:
+        logger.error(f'Database export failed: {exc}', exc_info=True)
+        return jsonify({'error': 'Gagal membuat cadangan database.'}), 500
+    finally:
+        for path in (temp_path, temp_path + '-wal', temp_path + '-shm'):
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except OSError:
+                pass
+
+    stamp = datetime.now().strftime('%Y%m%d_%H%M')
+    return send_file(
+        io.BytesIO(payload),
+        as_attachment=True,
+        download_name=f'sunscraping_db_{stamp}.db',
+        mimetype='application/vnd.sqlite3',
+    )
+
+
+@app.route('/api/database/import', methods=['POST'])
+@require_api_key
+def import_database():
+    """Replace all data with an uploaded .db, after keeping a safety copy."""
+    uploaded = request.files.get('file')
+    if uploaded is None or not uploaded.filename:
+        return jsonify({'error': 'Pilih file cadangan .db.'}), 400
+
+    safe_name = secure_filename(uploaded.filename)
+    extension = os.path.splitext(safe_name)[1].lower()
+    if extension not in BACKUP_EXTENSIONS:
+        return jsonify({'error': 'Format cadangan harus .db atau .sqlite.'}), 400
+
+    filepath = os.path.join(
+        UPLOAD_FOLDER, f'restore_{uuid.uuid4().hex}{extension}'
+    )
+    uploaded.save(filepath)
+    try:
+        try:
+            incoming = database.inspect_backup(filepath)
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
+
+        safety_name = (
+            'pre_restore_'
+            + datetime.now().strftime('%Y%m%d_%H%M%S')
+            + '.db'
+        )
+        safety_path = os.path.join(BACKUP_FOLDER, safety_name)
+        try:
+            database.backup_database(safety_path)
+        except (OSError, sqlite3.Error) as exc:
+            logger.error(f'Pre-restore backup failed: {exc}', exc_info=True)
+            return jsonify({
+                'error': 'Cadangan pengaman gagal dibuat, jadi pemulihan dibatalkan. '
+                         'Data lama tidak diubah.'
+            }), 500
+
+        try:
+            database.restore_database(filepath)
+        except (OSError, sqlite3.Error) as exc:
+            logger.error(f'Database restore failed: {exc}', exc_info=True)
+            return jsonify({
+                'error': 'Gagal memulihkan database. Data lama tetap tersimpan di '
+                         + safety_name + '.'
+            }), 500
+
+        _prune_safety_backups()
+        restored = database.get_database_info()
+        logger.info(
+            f'Database restored from {safe_name}: '
+            f"{restored['counts'].get('audits')} audits, "
+            f"{restored['counts'].get('targets')} targets; "
+            f'safety copy {safety_name}'
+        )
+        return jsonify({
+            'success': True,
+            'file': safe_name,
+            'safety_backup': safety_name,
+            'source': incoming,
+            'restored': restored,
+        })
+    finally:
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        except OSError as exc:
+            logger.warning(f'Could not remove restore upload {filepath}: {exc}')
+
 
 def write_pid():
     """Write current process PID to file for clean shutdown."""

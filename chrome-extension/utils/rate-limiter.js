@@ -3,7 +3,7 @@
  * Best-effort safety throttling system
  * 
  * Layer 1: Session Break (istirahat berkala)
- * Layer 2: Daily Limit (batas harian)
+ * Layer 2: Visit budget (per siklus, dengan rail harian sebagai rem darurat)
  * Layer 3: Auto Speed Selection (pilih mode otomatis)
  * Layer 4: Random Dwell Time (simulasi baca halaman)
  * Layer 5: Warm-up Phase (awal sesi ekstra lambat)
@@ -34,6 +34,7 @@ const RateLimiter = {
   
   SESSION_BREAK_MIN: 180000,  // 3 menit
   SESSION_BREAK_MAX: 300000,  // 5 menit
+  MAX_DELAY_MS: 60000,        // ceiling for mode range x warmup x fatigue x backoff
 
   needsSessionBreak() {
     return this.sessionTaskCount >= this.sessionBreakThreshold;
@@ -45,11 +46,11 @@ const RateLimiter = {
     return duration;
   },
 
-  resetSessionBreak() {
+  async resetSessionBreak() {
     this.sessionTaskCount = 0;
     // Randomize next threshold so it's not predictable
     this.sessionBreakThreshold = 30 + Math.floor(Math.random() * 21);
-    this._persistSession();
+    await this._persistSession();
   },
 
   recordTaskCompleted() {
@@ -57,47 +58,61 @@ const RateLimiter = {
   },
 
   // ============================================================
-  // LAYER 2: DAILY LIMIT
-  // Max tasks per hari untuk keamanan akun
+  // LAYER 2: VISIT BUDGET
+  // One cycle = one run: the accounts it visits plus their posts. The budget is
+  // spent per cycle, not per calendar day, because the operator thinks in runs
+  // ("selesaikan audit ini"), while the platform still sees a wall clock — so a
+  // wide daily rail stays in place underneath the cycle budget.
   // ============================================================
-  DAILY_LIMIT: 500,
-  dailyTaskCount: 0,
+  VISIT_BUDGET: 500,
+  DAILY_VISIT_RAIL: 2000,
+  cycleId: null,
+  cycleVisits: 0,
+  dailyVisits: 0,
   lastResetDate: new Date().toDateString(),
 
   /**
-   * Initialize: load persisted daily counters from chrome.storage
+   * Initialize: load persisted visit counters from chrome.storage
    */
   async init() {
     try {
       const data = await chrome.storage.local.get([
-        'sa_dailyTaskCount', 'sa_lastResetDate',
+        'sa_dailyTaskCount', 'sa_lastResetDate', 'sa_cycleId', 'sa_cycleVisits',
         'sa_sessionTaskCount', 'sa_sessionBreakThreshold', 'sa_totalTasksThisSession',
         'sa_consecutiveErrors', 'sa_backoffMultiplier'
       ]);
       const today = new Date().toDateString();
-      if (data.sa_lastResetDate === today) {
-        this.dailyTaskCount = Number(data.sa_dailyTaskCount) || 0;
+      const sameDay = data.sa_lastResetDate === today;
+
+      if (sameDay) {
+        this.dailyVisits = Number(data.sa_dailyTaskCount) || 0;
         this.lastResetDate = today;
-        console.log(`[RateLimiter] Restored daily count: ${this.dailyTaskCount}/${this.DAILY_LIMIT}`);
+        this.cycleId = data.sa_cycleId || null;
+        this.cycleVisits = Number(data.sa_cycleVisits) || 0;
+        console.log(`[RateLimiter] Restored visits: ${this.cycleVisits}/${this.VISIT_BUDGET} siklus ini, ${this.dailyVisits}/${this.DAILY_VISIT_RAIL} hari ini`);
+
+        const sessionCount = Number(data.sa_sessionTaskCount);
+        if (Number.isFinite(sessionCount) && sessionCount >= 0) {
+          this.sessionTaskCount = sessionCount;
+        }
+        const totalTasks = Number(data.sa_totalTasksThisSession);
+        if (Number.isFinite(totalTasks) && totalTasks >= 0) {
+          this.totalTasksThisSession = totalTasks;
+        }
       } else {
-        // New day — reset
-        this.dailyTaskCount = 0;
-        this.lastResetDate = today;
+        // New day: counters start over, otherwise a stale totalTasksThisSession
+        // leaves warm-up permanently disabled.
+        await this.startSession();
+        this.dailyVisits = 0;
+        this.cycleVisits = 0;
+        this.cycleId = null;
         await this._persistDaily();
-        console.log('[RateLimiter] New day — daily counter reset.');
+        console.log('[RateLimiter] New day — visit counters and session counters reset.');
       }
 
-      const sessionCount = Number(data.sa_sessionTaskCount);
-      if (Number.isFinite(sessionCount) && sessionCount >= 0) {
-        this.sessionTaskCount = sessionCount;
-      }
       const threshold = Number(data.sa_sessionBreakThreshold);
       if (Number.isFinite(threshold) && threshold >= 10 && threshold <= 100) {
         this.sessionBreakThreshold = threshold;
-      }
-      const totalTasks = Number(data.sa_totalTasksThisSession);
-      if (Number.isFinite(totalTasks) && totalTasks >= 0) {
-        this.totalTasksThisSession = totalTasks;
       }
       const errors = Number(data.sa_consecutiveErrors);
       if (Number.isFinite(errors) && errors >= 0) {
@@ -114,44 +129,84 @@ const RateLimiter = {
     }
   },
 
+  /**
+   * A session starts when the user turns the worker on (and on a new day):
+   * warm-up and the session-break budget begin again from zero. The visit
+   * counters deliberately survive, or restarting the worker would refill them.
+   */
+  async startSession() {
+    this.totalTasksThisSession = 0;
+    this.sessionTaskCount = 0;
+    this.sessionBreakThreshold = 30 + Math.floor(Math.random() * 21);
+    this.consecutiveErrors = 0;
+    this.backoffMultiplier = 1;
+    this.lastResetDate = new Date().toDateString();
+    await this._persistSession();
+  },
+
   _persistSession() {
-    try {
-      chrome.storage.local.set({
-        sa_sessionTaskCount: this.sessionTaskCount,
-        sa_sessionBreakThreshold: this.sessionBreakThreshold,
-        sa_totalTasksThisSession: this.totalTasksThisSession,
-        sa_consecutiveErrors: this.consecutiveErrors,
-        sa_backoffMultiplier: this.backoffMultiplier
-      });
-    } catch (e) {}
+    // Awaited: an MV3 service worker can be evicted right after a task, and an
+    // unflushed counter silently grants extra visits.
+    return chrome.storage.local.set({
+      sa_sessionTaskCount: this.sessionTaskCount,
+      sa_sessionBreakThreshold: this.sessionBreakThreshold,
+      sa_totalTasksThisSession: this.totalTasksThisSession,
+      sa_consecutiveErrors: this.consecutiveErrors,
+      sa_backoffMultiplier: this.backoffMultiplier
+    }).catch(() => {});
   },
 
-  async _persistDaily() {
-    try {
-      await chrome.storage.local.set({
-        sa_dailyTaskCount: this.dailyTaskCount,
-        sa_lastResetDate: this.lastResetDate
-      });
-    } catch (e) {}
+  _persistDaily() {
+    return chrome.storage.local.set({
+      sa_dailyTaskCount: this.dailyVisits,
+      sa_lastResetDate: this.lastResetDate,
+      sa_cycleId: this.cycleId,
+      sa_cycleVisits: this.cycleVisits
+    }).catch(() => {});
   },
 
-  checkDailyLimit() {
+  /**
+   * A cycle is one run (its accounts plus their posts). Entering a different
+   * cycle refills the budget; re-entering the same cycle does not.
+   */
+  async beginCycle(cycleId) {
+    const next = cycleId === null || cycleId === undefined ? null : String(cycleId);
+    if (next === this.cycleId) return false;
+    this.cycleId = next;
+    this.cycleVisits = 0;
+    await this._persistDaily();
+    console.log(`[RateLimiter] Cycle ${next || 'unknown'} — ${this.VISIT_BUDGET} kunjungan tersedia.`);
+    return true;
+  },
+
+  /** Today's date rolls the rail over; a stalled worker must not stay locked. */
+  async _rollDayIfNeeded() {
     const today = new Date().toDateString();
-    if (today !== this.lastResetDate) {
-      this.dailyTaskCount = 0;
-      this.lastResetDate = today;
-      this._persistDaily();
-    }
-    return this.dailyTaskCount < this.DAILY_LIMIT;
+    if (today === this.lastResetDate) return;
+    this.dailyVisits = 0;
+    this.cycleVisits = 0;
+    this.cycleId = null;
+    await this.startSession();
+    await this._persistDaily();
   },
 
-  recordDailyTask() {
-    this.dailyTaskCount++;
-    this._persistDaily();
+  async hasVisitBudget() {
+    await this._rollDayIfNeeded();
+    return this.cycleVisits < this.VISIT_BUDGET && this.dailyVisits < this.DAILY_VISIT_RAIL;
   },
 
-  getDailyRemaining() {
-    return Math.max(0, this.DAILY_LIMIT - this.dailyTaskCount);
+  async recordVisit() {
+    await this._rollDayIfNeeded();
+    this.cycleVisits++;
+    this.dailyVisits++;
+    await this._persistDaily();
+  },
+
+  getVisitsRemaining() {
+    return Math.max(0, Math.min(
+      this.VISIT_BUDGET - this.cycleVisits,
+      this.DAILY_VISIT_RAIL - this.dailyVisits
+    ));
   },
 
   // ============================================================
@@ -240,51 +295,74 @@ const RateLimiter = {
     // Apply error backoff
     delay *= this.backoffMultiplier;
     
-    return Math.round(delay);
+    // Clamped last: warm-up, fatigue and backoff multiply the range, so the
+    // mode label is only the starting point. Without a ceiling a backoff of 10
+    // in safe mode turns a 10 second pace into minutes of dead time.
+    return Math.min(this.MAX_DELAY_MS, Math.round(delay));
   },
 
   // ============================================================
   // ERROR TRACKING
   // ============================================================
-  reportSuccess() {
+  async reportSuccess() {
     this.consecutiveErrors = 0;
     this.backoffMultiplier = 1;
     this.totalTasksThisSession++;
     this.recordTaskCompleted();
-    this.recordDailyTask();
-    this._persistSession();
+    await this.recordVisit();
+    await this._persistSession();
   },
 
-  reportError() {
+  async reportError() {
     this.consecutiveErrors++;
     this.backoffMultiplier = Math.min(10, Math.pow(1.5, this.consecutiveErrors));
     this.totalTasksThisSession++;
     this.recordTaskCompleted();
-    this.recordDailyTask();
-    this._persistSession();
+    await this.recordVisit();
+    await this._persistSession();
   },
 
   /**
-   * Extra page visit (e.g. follower lookup) that is not a task but still
-   * counts toward the session-break budget.
+   * Extra page visit (e.g. the profile harvest). It is not a task, but it is
+   * still a visit the platform sees, so it spends the cycle budget and counts
+   * toward the session-break budget as well.
    */
   async recordAuxiliaryVisit() {
     this.sessionTaskCount++;
-    this._persistSession();
+    await this.recordVisit();
+    await this._persistSession();
   },
 
   // ============================================================
   // STATUS & ESTIMATES
   // ============================================================
+  /**
+   * The pace the operator will actually experience: the mode range with the
+   * warm-up, fatigue and backoff multipliers applied and capped like getDelay.
+   */
+  getPaceLabel() {
+    const { min, max } = this.MODES[this.currentMode];
+    const factor = Math.min(
+      this.MAX_DELAY_MS / max,
+      this.getWarmupMultiplier() * this.getFatigueMultiplier() * this.backoffMultiplier
+    );
+    return `${Math.round((min * factor) / 1000)}-${Math.round((max * factor) / 1000)} dtk`;
+  },
+
   getStatus() {
     return {
       mode: this.currentMode,
       modeLabel: this.MODES[this.currentMode]?.label || this.currentMode,
+      paceLabel: this.getPaceLabel(),
       sessionTasks: this.sessionTaskCount,
       sessionBreakAt: this.sessionBreakThreshold,
-      dailyTasks: this.dailyTaskCount,
-      dailyLimit: this.DAILY_LIMIT,
-      dailyRemaining: this.getDailyRemaining(),
+      cycleId: this.cycleId,
+      cycleVisits: this.cycleVisits,
+      visitBudget: this.VISIT_BUDGET,
+      cycleRemaining: Math.max(0, this.VISIT_BUDGET - this.cycleVisits),
+      dailyVisits: this.dailyVisits,
+      dailyRail: this.DAILY_VISIT_RAIL,
+      remaining: this.getVisitsRemaining(),
       isWarmup: this.isWarmingUp(),
       fatigue: this.getFatigueMultiplier(),
       backoff: this.backoffMultiplier,
@@ -293,7 +371,10 @@ const RateLimiter = {
 
   estimateTime(remainingCount) {
     const { min, max } = this.MODES[this.currentMode];
-    const avgDelay = ((min + max) / 2) * this.backoffMultiplier;
+    // Same maths as getDelay, or the ETA promises a third of the real duration.
+    const multiplied = ((min + max) / 2)
+      * this.getWarmupMultiplier() * this.getFatigueMultiplier() * this.backoffMultiplier;
+    const avgDelay = Math.min(this.MAX_DELAY_MS, multiplied);
     const avgPerItem = avgDelay + 4000; // ~4s per page load
     
     // Add session breaks

@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "sunscraping session bridge",
+  "version": "1.1.0",
+  "description": "Ekspor cookie sesi Instagram/TikTok dari Chrome ini ke aplikasi desktop sunscraping.",
+  "permissions": ["cookies", "downloads"],
+  "host_permissions": [
+    "*://*.instagram.com/*",
+    "*://*.tiktok.com/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Ekspor sesi sunscraping"
+  }
+}

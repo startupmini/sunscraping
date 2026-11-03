@@ -394,6 +394,10 @@
                 stopServerSilent();
 
                 var htaDir = getHtaDir();
+                if (htaDir.indexOf('"') >= 0) {
+                    alert("Path project mengandung tanda kutip. Pindahkan folder sunscraping ke path tanpa karakter kutip lalu coba lagi.");
+                    return;
+                }
                 shell.CurrentDirectory = htaDir;
                 shell.Run('cmd.exe /c "' + htaDir + '\\run_hidden.bat"', 0, false);
 
@@ -450,7 +454,9 @@
                     // Fallback: match the absolute app.py path this launcher starts.
                     // run_hidden.bat invokes python with the full path, so the command line is matchable.
                     // Single quotes only — nested \" quoting is unreliable through shell.Run.
-                    var appPy = htaDir + "\\backend\\app.py";
+                    // A quote in the path must not be able to end the PowerShell
+                    // string literal this fallback builds.
+                    var appPy = (htaDir + "\\backend\\app.py").replace(/'/g, "''");
                     var cmd = 'powershell -windowstyle hidden -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq \'python.exe\' -and $_.CommandLine -like \'*' + appPy + '*\' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"';
                     shell.Run(cmd, 0, true);
                 }
@@ -471,6 +477,11 @@
                 var xhr = new ActiveXObject("MSXML2.XMLHTTP");
                 xhr.open("GET", serverUrl("/api/health"), true); // TRUE = Asynchronous (non-blocking)
                 xhr.setRequestHeader("Accept", "application/json");
+                // Queue counts are only served to a paired caller; without the
+                // key the health check still proves the server is up.
+                if (currentApiKey) {
+                    try { xhr.setRequestHeader("X-API-Key", currentApiKey); } catch(e) {}
+                }
                 
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState == 4) {

@@ -6,6 +6,10 @@ cd backend
 
 if not exist runtime mkdir runtime
 
+:: Log is redirected to a file, so force UTF-8; the default codepage mangles
+:: accented usernames and crashes the worker on non-ASCII output.
+set "PYTHONIOENCODING=utf-8"
+
 :: Only install dependencies when an import is actually missing
 python -c "import flask, flask_cors, pandas, openpyxl" >nul 2>&1
 if errorlevel 1 (

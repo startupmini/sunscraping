@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "sunscraping",
   "short_name": "sunscraping",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Audit engagement Instagram & TikTok berulang — likes, comments, views, follower count, tren snapshot.",
   "permissions": [
     "storage",

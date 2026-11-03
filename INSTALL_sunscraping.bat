@@ -134,13 +134,13 @@ echo   [OK] Semua modul siap.
 :: ─────────────────────────────────────────────
 :: 4. LAUNCH
 :: ─────────────────────────────────────────────
-echo   [4/4] Membuka Control Panel...
+echo   [4/4] Membuka Launcher...
 echo.
 
-start sunscraping.hta
+start "" "%~dp0START_launcher.bat"
 
 echo   ╔══════════════════════════════════════════╗
-echo   ║   SETUP SELESAI! Control Panel terbuka.  ║
+echo   ║   SETUP SELESAI! Launcher terbuka.       ║
 echo   ║   Jendela ini akan tertutup otomatis.    ║
 echo   ╚══════════════════════════════════════════╝
 

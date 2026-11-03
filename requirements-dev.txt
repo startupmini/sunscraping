@@ -1,0 +1,4 @@
+# Dependensi pengembangan (bukan untuk produksi).
+# Dipakai suite tes di tests/: python -m pytest -q tests
+-r backend/requirements.txt
+pytest==9.2.0

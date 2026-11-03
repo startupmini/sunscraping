@@ -8,62 +8,17 @@
 (function() {
   'use strict';
 
-  /**
-   * Utility: parse angka dari text Instagram (e.g., "1,234", "12.5K", "1.2M")
-   */
-  function parseCount(text) {
-    if (text === null || text === undefined) return null;
-    if (typeof text === 'number') return text;
-    text = text.toString().trim().toLowerCase();
-    
-    // Konversi suffix Indonesia ke English
-    text = text.replace(/ribu|rb/g, 'k').replace(/juta|jt/g, 'm').replace(/miliar/g, 'b');
-
-    const match = text.match(/([\d.,]+)\s*([kmb])?/i);
-    if (match) {
-      const num = parseLocaleNumber(match[1], !!match[2]);
-      if (num === null) return null;
-      const multipliers = { 'k': 1000, 'm': 1000000, 'b': 1000000000 };
-      const mult = multipliers[match[2]] || 1;
-      return Math.round(num * mult);
-    }
-
-    const num = parseLocaleNumber(text.replace(/[^\d.,]/g, ''), false);
-    return num === null ? null : Math.round(num);
-  }
-
-  // truncateText lives in content/common.js (shared with the TikTok scraper).
+  // parseCount, truncateText and errorResult live in content/common.js, shared
+  // with the TikTok scraper.
+  const parseCount = SA_CONTENT.parseCount;
   const truncateText = SA_CONTENT.truncateText;
+  const errorResult = SA_CONTENT.errorResult;
 
-  function parseLocaleNumber(value, hasSuffix) {
-    if (!value) return null;
-
-    let normalized = value.toString().trim().replace(/\s/g, '');
-    const hasComma = normalized.includes(',');
-    const hasDot = normalized.includes('.');
-
-    if (hasComma && hasDot) {
-      const lastComma = normalized.lastIndexOf(',');
-      const lastDot = normalized.lastIndexOf('.');
-      const decimalSep = lastComma > lastDot ? ',' : '.';
-      const thousandsSep = decimalSep === ',' ? '.' : ',';
-      normalized = normalized.replace(new RegExp(`\\${thousandsSep}`, 'g'), '').replace(decimalSep, '.');
-    } else if (hasComma || hasDot) {
-      const sep = hasComma ? ',' : '.';
-      const parts = normalized.split(sep);
-      const lastPart = parts[parts.length - 1];
-      const shouldTreatAsDecimal = hasSuffix && lastPart.length <= 2;
-
-      if (shouldTreatAsDecimal) {
-        normalized = parts.slice(0, -1).join('') + '.' + lastPart;
-      } else {
-        normalized = parts.join('');
-      }
-    }
-
-    const num = parseFloat(normalized);
-    return isNaN(num) ? null : num;
-  }
+  // A rendered counter token kept whole (suffix included) for the shared
+  // parseCount, so Indonesian "7,4rb"/"1,2 jt" and English "7.4K" resolve to the
+  // same number instead of the follower count landing as null on a localized
+  // profile page.
+  const COUNT_TOKEN = /[\d.,]+\s*(?:billion|million|thousand|miliar|milyar|juta|ribu|mn|jt|rb|[kKmMbB])?/;
 
   /**
    * Wait for element to appear in DOM
@@ -135,6 +90,10 @@
   ];
   const VIEW_COUNT_KEY_SET = new Set(VIEW_COUNT_KEYS.map(normalizeObjectKey));
   const VIEW_TEXT_PATTERN = /([\d,.]+(?:\s*(?:[KkMmBb]|rb|ribu|jt|juta|miliar))?)\s*(?:views?|plays?|tayangan|pemutaran|ditonton|kali\s+diputar|diputar)\b/i;
+  // Cheap relevance test for multi-megabyte page scripts: only blobs that
+  // mention a counter are ever handed to JSON.parse.
+  const PLAY_COUNT_HINT = /play_count|playCount|view_count|viewCount/i;
+  const FOLLOWER_COUNT_HINT = /follower_count|followerCount|edge_followed_by/i;
 
   function normalizeObjectKey(key) {
     return key.toString().replace(/[_-]/g, '').toLowerCase();
@@ -168,12 +127,6 @@
     }
 
     return mediaId.toString();
-  }
-
-  function getCookieValue(name) {
-    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const match = document.cookie.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
-    return match ? decodeURIComponent(match[1]) : '';
   }
 
   function isVideoOrReelUrl(url) {
@@ -241,6 +194,37 @@
     return best;
   }
 
+  function firstValue(...values) {
+    for (const value of values) {
+      if (value !== null && value !== undefined && value !== '') return value;
+    }
+    return null;
+  }
+
+  /**
+   * Everything one media node knows, not just the view count. Reels pages ship
+   * the author, upload time and caption only inside this payload, so reading
+   * play_count and dropping the rest is what left 111 Instagram rows with no
+   * handle, no date and no caption.
+   */
+  function fieldsFromMediaNode(node) {
+    const user = node.user || node.owner || null;
+    const caption = node.caption && typeof node.caption === 'object'
+      ? node.caption.text
+      : node.edge_media_to_caption?.edges?.[0]?.node?.text ?? node.caption;
+    return {
+      username: (user && (user.username || user.unique_id || user.uniqueId)) || null,
+      postDate: SA_CONTENT.toIsoTime(
+        node.taken_at ?? node.taken_at_timestamp ?? node.timestamp ?? node.date ?? null
+      ),
+      caption: caption ? truncateText(caption, 500) : null,
+      likes: parseCount(node.like_count ?? node.edge_liked_by?.count ?? node.edge_media_preview_like?.count),
+      comments: parseCount(node.comment_count ?? node.edge_media_to_comment?.count),
+      views: viewsFromMediaNode(node),
+      followerCount: parseCount(user && (user.follower_count ?? user.edge_followed_by?.count)),
+    };
+  }
+
   /**
    * Strategy 2a: Parse from application/ld+json
    */
@@ -271,7 +255,16 @@
    * Only counts nested inside the target media node are accepted.
    */
   function extractFromPageScripts(mediaId, shortcode) {
-    const result = { views: null, isVideo: false };
+    const result = {
+      views: null,
+      isVideo: false,
+      username: null,
+      postDate: null,
+      caption: null,
+      likes: null,
+      comments: null,
+      followerCount: null,
+    };
     let bestViews = null;
 
     const scripts = document.querySelectorAll('script');
@@ -283,21 +276,28 @@
         result.isVideo = true;
       }
 
-      const looksLikeJson = text.trim().startsWith('{')
-        || text.trim().startsWith('[')
-        || script.type === 'application/json';
-      if (!looksLikeJson || text.length > 2000000) continue;
+      const looksLikeJson = script.type === 'application/json' || /^\s*[[{]/.test(text);
+      // Instagram's data-sjs payloads run to several megabytes and are exactly
+      // where play_count lives, so size alone must not skip them. Relevance
+      // decides: a blob that never mentions a counter is not parsed at all.
+      if (!looksLikeJson || !PLAY_COUNT_HINT.test(text)) continue;
 
       try {
         const data = JSON.parse(text);
         const node = findMediaNode(data, mediaId, shortcode);
         if (!node) continue;
 
-        const views = viewsFromMediaNode(node);
-        if (views !== null && (bestViews === null || views > bestViews)) {
-          bestViews = views;
+        const fields = fieldsFromMediaNode(node);
+        if (fields.views !== null && (bestViews === null || fields.views > bestViews)) {
+          bestViews = fields.views;
           result.isVideo = true;
         }
+        result.username = result.username || fields.username;
+        result.postDate = result.postDate || fields.postDate;
+        result.caption = result.caption || fields.caption;
+        result.likes = result.likes ?? fields.likes;
+        result.comments = result.comments ?? fields.comments;
+        result.followerCount = result.followerCount ?? fields.followerCount;
       } catch (e) {}
     }
 
@@ -315,10 +315,8 @@
         signal: controller.signal,
         headers: {
           'Accept': 'application/json,text/javascript,*/*;q=0.1',
+          // Public web-client id; /api/v1/ rejects requests without it.
           'X-IG-App-ID': '936619743392459',
-          'X-ASBD-ID': '129477',
-          'X-Requested-With': 'XMLHttpRequest',
-          'X-CSRFToken': getCookieValue('csrftoken'),
         },
       });
 
@@ -337,39 +335,22 @@
   }
 
   /**
-   * Strategy 2c: Query Instagram's own JSON endpoints from the logged-in page.
-   * This catches modern Reels where play_count is not rendered in DOM/meta.
+   * Strategy 2c: Instagram's own media endpoint, from the logged-in page.
+   * Last resort for Reels whose play count never reaches meta tags or the DOM.
+   * The old "?__a=1&__d=dis" page fetch was dropped: Instagram stopped serving
+   * JSON there, so it only added latency to every single post.
    */
   async function extractFromInstagramApi(linkObj, shortcode, mediaId) {
-    const sourceUrl = (linkObj && linkObj.url) || window.location.href;
-    shortcode = shortcode || getShortcodeFromUrl(sourceUrl) || getShortcodeFromUrl(window.location.href);
-    const result = { views: null };
+    shortcode = shortcode
+      || getShortcodeFromUrl((linkObj && linkObj.url) || window.location.href)
+      || getShortcodeFromUrl(window.location.href);
+    mediaId = mediaId || (shortcode ? shortcodeToMediaId(shortcode) : null);
+    if (!mediaId) return { views: null };
 
-    if (!shortcode) return result;
-
-    mediaId = mediaId || shortcodeToMediaId(shortcode);
-    const urls = [];
-
-    if (mediaId) {
-      urls.push(`https://www.instagram.com/api/v1/media/${mediaId}/info/`);
-    }
-
-    urls.push(`https://www.instagram.com/${isVideoOrReelUrl(sourceUrl) ? 'reel' : 'p'}/${shortcode}/?__a=1&__d=dis`);
-
-    for (const url of urls) {
-      const data = await fetchInstagramJson(url);
-      if (!data) continue;
-
-      const node = findMediaNode(data, mediaId, shortcode);
-      if (!node) continue;
-
-      const views = viewsFromMediaNode(node);
-      if (views !== null && (result.views === null || views > result.views)) {
-        result.views = views;
-      }
-    }
-
-    return result;
+    const data = await fetchInstagramJson(`https://www.instagram.com/api/v1/media/${mediaId}/info/`);
+    const node = data ? findMediaNode(data, mediaId, shortcode) : null;
+    if (!node) return { views: null };
+    return fieldsFromMediaNode(node);
   }
 
   /**
@@ -386,13 +367,20 @@
     };
 
     // --- USERNAME ---
-    const headerLink = document.querySelector('header a[href^="/"]');
-    if (headerLink) {
-      result.username = headerLink.getAttribute('href').replace(/\//g, '');
-    }
+    // Only the profile link, the "(@handle)" title form, or the og:title copy
+    // count. The old fallback took the display name out of "Name on Instagram",
+    // which turned "Salsabilla F" into a handle that matches no account.
+    const RESERVED_PATHS = /^(explore|reels?|p|tv|accounts|direct|about|developer|legal|directory|challenge|stories)$/i;
+    const handleFromPath = (href) => {
+      const match = String(href || '').match(/^\/([A-Za-z0-9_.]+)\/?$/);
+      return match && !RESERVED_PATHS.test(match[1]) ? match[1] : null;
+    };
+    result.username = handleFromPath(document.querySelector('header a[href^="/"]')?.getAttribute('href'));
     if (!result.username) {
-      const titleMatch = document.title.match(/@([a-zA-Z0-9_.-]+)/) || document.title.match(/^(.*?)\s+on Instagram/i);
-      if (titleMatch) result.username = titleMatch[1];
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      const titleText = [document.title, ogTitle ? ogTitle.getAttribute('content') : ''].join(' ');
+      const handleMatch = titleText.match(/\(@([a-zA-Z0-9_.-]+)\)/) || titleText.match(/@([a-zA-Z0-9_.]+)\s+on Instagram/i);
+      if (handleMatch) result.username = handleMatch[1];
     }
 
     // Leaf nodes only: reading textContent of every ancestor div is O(n^2)
@@ -463,11 +451,24 @@
     if (captionEl) {
       result.caption = truncateText(captionEl.textContent, 500);
     }
+    if (!result.caption) {
+      const ogDesc = document.querySelector('meta[property="og:description"]');
+      const ogText = ogDesc ? (ogDesc.getAttribute('content') || '').trim() : '';
+      // "1,234 Likes, 56 Comments - Name (@handle) on Instagram: \"caption\""
+      const quoted = ogText.match(/Instagram:\s*["“]([\s\S]+)["”]\s*$/);
+      if (quoted) result.caption = truncateText(quoted[1], 500);
+    }
 
     // --- POST DATE ---
-    const timeEl = document.querySelector('time[datetime]');
+    const timeEl = document.querySelector('time[datetime]')
+      || document.querySelector('a[href*="/p/"] time[datetime]')
+      || document.querySelector('a[href*="/reel/"] time[datetime]');
     if (timeEl) {
-      result.postDate = timeEl.getAttribute('datetime');
+      result.postDate = SA_CONTENT.toIsoTime(timeEl.getAttribute('datetime'));
+    }
+    if (!result.postDate) {
+      const published = document.querySelector('meta[property="article:published_time"]');
+      if (published) result.postDate = SA_CONTENT.toIsoTime(published.getAttribute('content'));
     }
 
     return result;
@@ -505,7 +506,7 @@
     const scripts = document.querySelectorAll('script:not([src])');
     for (const script of scripts) {
       const text = script.textContent || '';
-      if (!text || !text.includes('follower_count') || text.length > 1500000) continue;
+      if (!text || !FOLLOWER_COUNT_HINT.test(text)) continue;
       try {
         const data = JSON.parse(text);
         const node = findUserNode(data, username);
@@ -548,7 +549,8 @@
     const metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) {
       const content = metaDesc.getAttribute('content') || '';
-      const followerMatch = content.match(/([\d,.]+[KkMmBb]?)\s*Followers/i) || content.match(/([\d,.]+[KkMmBb]?)\s*Pengikut/i);
+      const followerMatch = content.match(new RegExp('(' + COUNT_TOKEN.source + ')\\s*Followers', 'i'))
+        || content.match(new RegExp('(' + COUNT_TOKEN.source + ')\\s*Pengikut', 'i'));
       if (followerMatch) {
         return parseCount(followerMatch[1]);
       }
@@ -591,7 +593,28 @@
     const jsonData = extractFromEmbeddedJson() || {};
     const scriptData = extractFromPageScripts(mediaId, shortcode);
     const domData = extractFromDOM();
-    const apiData = await extractFromInstagramApi(linkObj, shortcode, mediaId);
+
+    let username = firstValue(metaData.username, jsonData.username, scriptData.username, domData.username);
+    let likes = firstValue(metaData.likes, jsonData.likes, scriptData.likes, domData.likes);
+    let comments = firstValue(metaData.comments, jsonData.comments, scriptData.comments, domData.comments);
+    let views = firstValue(metaData.views, jsonData.views, scriptData.views, domData.views);
+    let caption = firstValue(jsonData.caption, scriptData.caption, domData.caption);
+    let postDate = firstValue(jsonData.postDate, scriptData.postDate, domData.postDate);
+    let followerCount = scriptData.followerCount ?? null;
+
+    // One request, and only when the page left a hole. The old rule was "views
+    // missing" alone, so a reels page that showed views was never asked for the
+    // author, date or caption it had not rendered.
+    if (username === null || postDate === null || caption === null || views === null) {
+      const apiData = await extractFromInstagramApi(linkObj, shortcode, mediaId) || {};
+      username = username ?? apiData.username ?? null;
+      likes = likes ?? apiData.likes ?? null;
+      comments = comments ?? apiData.comments ?? null;
+      views = views ?? apiData.views ?? null;
+      caption = caption ?? apiData.caption ?? null;
+      postDate = postDate ?? apiData.postDate ?? null;
+      followerCount = followerCount ?? apiData.followerCount ?? null;
+    }
 
     const isVideoContent = scriptData.isVideo
       || isVideoOrReelUrl(window.location.href)
@@ -602,14 +625,14 @@
     const result = {
       platform: 'instagram',
       url: window.location.href,
-      username: metaData.username || jsonData.username || domData.username || null,
-      likes: metaData.likes ?? jsonData.likes ?? domData.likes ?? null,
-      comments: metaData.comments ?? jsonData.comments ?? domData.comments ?? null,
-      views: apiData.views ?? metaData.views ?? jsonData.views ?? scriptData.views ?? domData.views ?? null,
+      username,
+      likes,
+      comments,
+      views,
       shares: null,
-      caption: truncateText(jsonData.caption || domData.caption || null, 500),
-      postDate: (jsonData.postDate || domData.postDate || '').substring(0, 10) || null,
-      followerCount: null,
+      caption: truncateText(caption, 500),
+      postDate,
+      followerCount,
       status: 'OK',
       error: null,
       errorCode: null,
@@ -654,40 +677,177 @@
       && (result.likes !== null || result.comments !== null)
     ) {
       result.status = 'PARTIAL';
-      result.error = 'Views not found (video/reel; API fallback unavailable)';
+      result.error = 'Views not found (video/reel; neither the page nor the API returned a count)';
     }
 
     return result;
   }
 
   /**
-   * Scrape follower count from a profile page
+   * "7.4k Followers, 12 Following, 214 Posts - ..." is served in the meta tag of
+   * every public profile, so the three account totals cost no extra request.
    */
-  async function scrapeInstagramProfile() {
+  function countsFromMetaDescription() {
+    const meta = document.querySelector('meta[name="description"]');
+    const content = meta ? (meta.getAttribute('content') || '') : '';
+    const grab = (label) => {
+      const match = content.match(new RegExp('(' + COUNT_TOKEN.source + ')\\s*(?:' + label + ')', 'i'));
+      return match ? parseCount(match[1]) : null;
+    };
+    return {
+      followerCount: grab('Followers|Pengikut'),
+      followingCount: grab('Following|Mengikuti'),
+      postCount: grab('Posts|Postingan'),
+    };
+  }
+
+  /**
+   * The display name is served in the meta description / og:title of every
+   * public profile, so a profile visit that never reached the web_profile_info
+   * JSON still fills the identity field instead of leaving it blank forever.
+   *   "... Posts - Display Name (@handle) on Instagram" -> Display Name
+   *   "Display Name (@handle) • Instagram photos and videos" -> Display Name
+   */
+  function displayNameFromMeta() {
+    const metaDesc = document.querySelector('meta[name="description"]');
+    const content = metaDesc ? (metaDesc.getAttribute('content') || '') : '';
+
+    let match = content.match(/[-–—]\s+(.+?)\s+on Instagram$/i);
+    if (match) {
+      const name = match[1].trim();
+      if (name && !/^See .+ and videos from /.test(name)) return truncateText(name, 120);
+    }
+
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) {
+      const title = ogTitle.getAttribute('content') || '';
+      match = title.match(/^(.+?)\s+\(@[\w.]+\)/);
+      if (match) return truncateText(match[1].trim(), 120);
+    }
+    return null;
+  }
+
+  /** Same scan the follower lookup uses, but returning the whole user node. */
+  function findProfileUserNode(username) {
+    if (!username) return null;
+    const scripts = document.querySelectorAll('script:not([src])');
+    for (const script of scripts) {
+      const text = script.textContent || '';
+      if (!text || !FOLLOWER_COUNT_HINT.test(text)) continue;
+      try {
+        const node = findUserNode(JSON.parse(text), username);
+        if (node) return node;
+      } catch (e) {}
+    }
+    return null;
+  }
+
+  /**
+   * Canonical ref is the shortcode: it is also the tail of the post URL, so the
+   * backend dedupes the same post whether it arrived from page JSON or the API.
+   */
+  function postsFromTimeline(node) {
+    const timeline = node && (node.edge_owner_to_timeline_media || node.timeline);
+    const rawEdges = Array.isArray(timeline && timeline.edges) ? timeline.edges
+      : (Array.isArray(node && node.items) ? node.items : null);
+    if (!rawEdges) return null;
+
+    return SA_CONTENT.recentPosts(rawEdges.map((edge) => {
+      const media = edge && edge.node ? edge.node : edge;
+      if (!media || typeof media !== 'object') return null;
+      const code = media.code || media.shortcode || null;
+      const isVideo = Boolean(media.is_video) || media.media_type === 2;
+      return {
+        id: code,
+        url: code ? `https://www.instagram.com/${isVideo ? 'reel' : 'p'}/${code}/` : null,
+        postedAt: media.taken_at ?? media.taken_at_timestamp ?? media.timestamp ?? null,
+        likes: media.edge_liked_by?.count ?? media.like_count ?? null,
+        comments: media.edge_media_to_comment?.count ?? media.comment_count ?? null,
+        views: media.video_view_count ?? media.play_count ?? null,
+        shares: null,
+        caption: media.edge_media_to_caption?.edges?.[0]?.node?.text
+          ?? (media.caption && media.caption.text) ?? null,
+        isVideo,
+      };
+    }));
+  }
+
+  async function fetchProfileFromWebApi(username) {
+    if (!username) return null;
+    const data = await fetchInstagramJson(
+      `https://www.instagram.com/api/v1/users/web_profile_info/?username=${encodeURIComponent(username)}`
+    );
+    return data && data.data ? data.data.user || null : null;
+  }
+
+  /**
+   * Scrape a profile page: account fingerprint plus its most recent posts.
+   * Everything comes out of the one visit — the post list is either embedded in
+   * the page or fetched from the same origin while the page is open.
+   */
+  async function scrapeInstagramProfile(requestedUsername) {
     await waitForSelector('meta[name="description"], header', 5000);
     await new Promise(r => setTimeout(r, 250));
 
-    const username = window.location.pathname.replace(/\//g, '');
+    const pathMatch = window.location.pathname.match(/^\/(@?[^/?#]+)/);
+    const pathUsername = pathMatch ? pathMatch[1].replace(/^@/, '') : '';
+    // The worker chose this profile, so its handle is the reliable key; the path
+    // is only a fallback for a scrape that was started from the page itself.
+    const username = requestedUsername || pathUsername;
+
+    const metaCounts = countsFromMetaDescription();
     let followerCount = extractFollowerCount();
-    if (followerCount === null) {
-      followerCount = extractFollowerFromPageScripts(username);
+    if (followerCount === null) followerCount = extractFollowerFromPageScripts(username);
+    if (followerCount === null) followerCount = metaCounts.followerCount;
+
+    let node = findProfileUserNode(username);
+    let postSource = 'page-json';
+    let posts = node ? postsFromTimeline(node) : null;
+    if (!posts || posts.length === 0) {
+      node = await fetchProfileFromWebApi(username) || node;
+      posts = node ? postsFromTimeline(node) : null;
+      postSource = posts && posts.length ? 'web-profile-api' : null;
     }
+    posts = posts || [];
+
+    if (followerCount === null && node) {
+      followerCount = parseCount(node.edge_followed_by?.count ?? node.follower_count ?? null);
+    }
+
     const blockState = detectBlockState();
     return {
-      followerCount,
-      username,
-      errorCode: followerCount === null ? blockState : null,
+      platform: 'instagram',
+      url: window.location.href,
+      username: (node && node.username) || username || null,
+      accountId: node && (node.pk ?? node.id) !== undefined ? String(node.pk ?? node.id) : null,
+      externalId: null,
+      displayName: (node && node.full_name) || displayNameFromMeta(),
+      bio: (node && node.biography) ? truncateText(node.biography, 300) : null,
+      region: null,
+      isVerified: node && node.is_verified !== undefined ? Boolean(node.is_verified) : null,
+      followerCount: followerCount,
+      followingCount: parseCount(node?.edge_follow?.count ?? null) ?? metaCounts.followingCount,
+      postCount: parseCount(node?.edge_owner_to_timeline_media?.count ?? null) ?? metaCounts.postCount,
+      posts: posts,
+      postSource: posts.length ? postSource : null,
+      status: followerCount !== null || posts.length > 0 ? 'OK' : 'FAILED',
+      errorCode: followerCount === null && posts.length === 0 ? blockState : null,
+      scrapedAt: new Date().toISOString(),
     };
   }
 
   // Listen for messages from background.js
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'scrapePost') {
-      scrapeInstagramPost(request.linkObj).then(sendResponse);
+      scrapeInstagramPost(request.linkObj)
+        .catch((error) => errorResult('instagram', window.location.href, error))
+        .then(sendResponse);
       return true; // async
     }
     if (request.action === 'scrapeProfile') {
-      scrapeInstagramProfile().then(sendResponse);
+      scrapeInstagramProfile(request.username)
+        .catch((error) => errorResult('instagram', window.location.href, error))
+        .then(sendResponse);
       return true;
     }
   });

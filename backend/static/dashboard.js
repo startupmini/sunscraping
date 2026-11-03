@@ -7,6 +7,9 @@
   var RECONNECT_MS = 10000;
   var REFRESH_LABEL_MS = 30000;
   var TARGETS_REFRESH_MS = 7000;
+  var ACCOUNTS_REFRESH_MS = 60000;
+  var SUMMARY_REFRESH_MS = 10000;
+  var COMPARE_REFRESH_MS = 30000;
 
   var el = {
     workerPill: document.getElementById('workerPill'),
@@ -18,12 +21,34 @@
     streamPillText: document.getElementById('streamPillText'),
     openImportBtn: document.getElementById('openImportBtn'),
     openExportBtn: document.getElementById('openExportBtn'),
-    openManageBtn: document.getElementById('openManageBtn'),
+    openDatabaseBtn: document.getElementById('openDatabaseBtn'),
     auditSelect: document.getElementById('auditSelect'),
+    sidebarAudit: document.getElementById('sidebarAudit'),
+    globalSearch: document.getElementById('globalSearch'),
     auditMeta: document.getElementById('auditMeta'),
+    auditCost: document.getElementById('auditCost'),
+    rerunCost: document.getElementById('rerunCost'),
+    processRetryBtn: document.getElementById('processRetryBtn'),
+    qaProcess: document.getElementById('qaProcess'),
+    qaAccounts: document.getElementById('qaAccounts'),
+    qaExport: document.getElementById('qaExport'),
+    qualityInfoBtn: document.getElementById('qualityInfoBtn'),
+    qualityInfo: document.getElementById('qualityInfo'),
+    summaryRiskCard: document.getElementById('summaryRiskCard'),
+    summaryRiskList: document.getElementById('summaryRiskList'),
+    summaryRiskCount: document.getElementById('summaryRiskCount'),
+    summaryRiskAll: document.getElementById('summaryRiskAll'),
+    topViewsAll: document.getElementById('topViewsAll'),
+    topErAll: document.getElementById('topErAll'),
+    compareBars: document.getElementById('compareBars'),
+    targetSelectAll: document.getElementById('targetSelectAll'),
+    targetBatch: document.getElementById('targetBatch'),
+    targetBatchCount: document.getElementById('targetBatchCount'),
+    targetBatchRetry: document.getElementById('targetBatchRetry'),
+    targetBatchClear: document.getElementById('targetBatchClear'),
     rerunBtn: document.getElementById('rerunBtn'),
+    rerunFullBtn: document.getElementById('rerunFullBtn'),
     retryFailedBtn: document.getElementById('retryFailedBtn'),
-    settingsBtn: document.getElementById('settingsBtn'),
     deleteAuditBtn: document.getElementById('deleteAuditBtn'),
     statPending: document.getElementById('stat-pending'),
     statRunning: document.getElementById('stat-running'),
@@ -35,8 +60,45 @@
     tableWrap: document.getElementById('tableWrap'),
     emptyState: document.getElementById('emptyState'),
     emptyCopy: document.getElementById('emptyCopy'),
+    navSummary: document.getElementById('navSummary'),
+    navActivity: document.getElementById('navActivity'),
+    navData: document.getElementById('navData'),
+    navSettings: document.getElementById('navSettings'),
+    pageSummary: document.getElementById('pageSummary'),
+    pageActivity: document.getElementById('pageActivity'),
+    pageTargets: document.getElementById('pageTargets'),
+    pageAccounts: document.getElementById('pageAccounts'),
+    pageSettings: document.getElementById('pageSettings'),
+    dataToolbar: document.getElementById('dataToolbar'),
+    dataActions: document.getElementById('dataActions'),
+    settingsWorker: document.getElementById('settingsWorker'),
+    pageCompare: document.getElementById('pageCompare'),
+    pageSearch: document.getElementById('pageSearch'),
+    tabSearch: document.getElementById('tabSearch'),
+    compareMonths: document.getElementById('compareMonths'),
+    compareInfoBtn: document.getElementById('compareInfoBtn'),
+    compareInfo: document.getElementById('compareInfo'),
+    compareSummary: document.getElementById('compareSummary'),
+    compareHead: document.getElementById('compareHead'),
+    compareBody: document.getElementById('compareBody'),
+    compareMore: document.getElementById('compareMore'),
+    dataSearch: document.getElementById('dataSearch'),
+    searchSummary: document.getElementById('searchSummary'),
+    searchEmpty: document.getElementById('searchEmpty'),
+    searchEmptyTitle: document.getElementById('searchEmptyTitle'),
+    searchEmptyCopy: document.getElementById('searchEmptyCopy'),
+    searchAccountsCard: document.getElementById('searchAccountsCard'),
+    searchAccountsBody: document.getElementById('searchAccountsBody'),
+    searchTargetsCard: document.getElementById('searchTargetsCard'),
+    searchTargetsBody: document.getElementById('searchTargetsBody'),
+    searchPostsCard: document.getElementById('searchPostsCard'),
+    searchPostsBody: document.getElementById('searchPostsBody'),
+    targetIssue: document.getElementById('targetIssue'),
+    auditPeriod: document.getElementById('auditPeriod'),
+    settingsPeriod: document.getElementById('settingsPeriod'),
+    activitySync: document.getElementById('activitySync'),
     tabTargets: document.getElementById('tabTargets'),
-    tabActivity: document.getElementById('tabActivity'),
+    tabAccounts: document.getElementById('tabAccounts'),
     targetPanel: document.getElementById('targetPanel'),
     activityPanel: document.getElementById('activityPanel'),
     targetSearch: document.getElementById('targetSearch'),
@@ -77,7 +139,6 @@
     exportStatus: document.getElementById('exportStatus'),
     exportHint: document.getElementById('exportHint'),
     clearBtn: document.getElementById('clearBtn'),
-    lastSync: document.getElementById('lastSync'),
     workerNotice: document.getElementById('workerNotice'),
     workerNoticeText: document.getElementById('workerNoticeText'),
     workerNoticeDismiss: document.getElementById('workerNoticeDismiss'),
@@ -88,9 +149,31 @@
     erInfo: document.getElementById('erInfo'),
     manageNote: document.getElementById('manageNote'),
     targetRetryBtn: document.getElementById('targetRetryBtn'),
+    summaryPanel: document.getElementById('summaryPanel'),
+    summarySkeleton: document.getElementById('summarySkeleton'),
+    summaryBody: document.getElementById('summaryBody'),
+    summaryEmpty: document.getElementById('summaryEmpty'),
+    summaryEmptyCopy: document.getElementById('summaryEmptyCopy'),
+    summaryImportBtn: document.getElementById('summaryImportBtn'),
+    summaryStamp: document.getElementById('summaryStamp'),
+    summaryKpi: document.getElementById('summaryKpi'),
+    summaryQuality: document.getElementById('summaryQuality'),
+    summaryTopViewsCard: document.getElementById('summaryTopViewsCard'),
+    summaryTopErCard: document.getElementById('summaryTopErCard'),
+    summaryPlatformBody: document.getElementById('summaryPlatformBody'),
+    summaryTopViewsBody: document.getElementById('summaryTopViewsBody'),
+    summaryTopErBody: document.getElementById('summaryTopErBody'),
+    summaryTemaCard: document.getElementById('summaryTemaCard'),
+    summaryTemaBody: document.getElementById('summaryTemaBody'),
+    summaryAuditCard: document.getElementById('summaryAuditCard'),
+    summaryAuditBody: document.getElementById('summaryAuditBody'),
+    summaryFootnote: document.getElementById('summaryFootnote'),
     emptyImportBtn: document.getElementById('emptyImportBtn'),
     activityImportBtn: document.getElementById('activityImportBtn'),
     summaryItems: Array.prototype.slice.call(document.querySelectorAll('.summary-item')),
+    processProgress: document.getElementById('processProgress'),
+    processSub: document.getElementById('processSub'),
+    processBar: document.getElementById('processBar'),
     toastContainer: document.getElementById('toastContainer'),
     importModal: document.getElementById('importModal'),
     closeImport: document.getElementById('closeImport'),
@@ -98,15 +181,28 @@
     exportModal: document.getElementById('exportModal'),
     closeExport: document.getElementById('closeExport'),
     cancelExport: document.getElementById('cancelExport'),
-    manageModal: document.getElementById('manageModal'),
-    closeManage: document.getElementById('closeManage'),
-    cancelManage: document.getElementById('cancelManage'),
-    settingsModal: document.getElementById('settingsModal'),
+    databaseModal: document.getElementById('databaseModal'),
+    closeDatabase: document.getElementById('closeDatabase'),
+    databaseStats: document.getElementById('databaseStats'),
+    dbSize: document.getElementById('dbSize'),
+    dbAudits: document.getElementById('dbAudits'),
+    dbTargets: document.getElementById('dbTargets'),
+    dbAccounts: document.getElementById('dbAccounts'),
+    dbPosts: document.getElementById('dbPosts'),
+    dbSnapshots: document.getElementById('dbSnapshots'),
+    dbUpdated: document.getElementById('dbUpdated'),
+    dbDownloadBtn: document.getElementById('dbDownloadBtn'),
+    dbDropzone: document.getElementById('dbDropzone'),
+    dbFileInput: document.getElementById('dbFileInput'),
+    dbFileChip: document.getElementById('dbFileChip'),
+    dbFileName: document.getElementById('dbFileName'),
+    dbFileSize: document.getElementById('dbFileSize'),
+    dbRemoveFile: document.getElementById('dbRemoveFile'),
+    dbRestoreBtn: document.getElementById('dbRestoreBtn'),
+    dbStatus: document.getElementById('dbStatus'),
     settingsForm: document.getElementById('settingsForm'),
     settingsName: document.getElementById('settingsName'),
     settingsRepeat: document.getElementById('settingsRepeat'),
-    settingsSub: document.getElementById('settingsSub'),
-    cancelSettings: document.getElementById('cancelSettings'),
     saveSettings: document.getElementById('saveSettings'),
     historyModal: document.getElementById('historyModal'),
     historyTitle: document.getElementById('historyTitle'),
@@ -115,12 +211,114 @@
     trendGrid: document.getElementById('trendGrid'),
     historyBody: document.getElementById('historyBody'),
     historyClose: document.getElementById('historyClose'),
+    targetToolbar: document.getElementById('targetToolbar'),
+    accountPanel: document.getElementById('accountPanel'),
+    accountSearch: document.getElementById('accountSearch'),
+    accountLevel: document.getElementById('accountLevel'),
+    accountBand: document.getElementById('accountBand'),
+    accountPlatform: document.getElementById('accountPlatform'),
+    accountVisitBtn: document.getElementById('accountVisitBtn'),
+    accountSummary: document.getElementById('accountSummary'),
+    accountClusters: document.getElementById('accountClusters'),
+    accountSkeleton: document.getElementById('accountSkeleton'),
+    accountEmpty: document.getElementById('accountEmpty'),
+    accountEmptyTitle: document.getElementById('accountEmptyTitle'),
+    accountEmptyCopy: document.getElementById('accountEmptyCopy'),
+    accountResetBtn: document.getElementById('accountResetBtn'),
+    accountRetryBtn: document.getElementById('accountRetryBtn'),
+    accountTableWrap: document.getElementById('accountTableWrap'),
+    accountHead: document.getElementById('accountHead'),
+    accountBody: document.getElementById('accountBody'),
+    accountPager: document.getElementById('accountPager'),
+    accountPageInfo: document.getElementById('accountPageInfo'),
+    accountPrev: document.getElementById('accountPrev'),
+    accountNext: document.getElementById('accountNext'),
+    reachInfo: document.getElementById('reachInfo'),
+    reachInfoBtn: document.getElementById('reachInfoBtn'),
+    accountModal: document.getElementById('accountModal'),
+    accountTitle: document.getElementById('accountTitle'),
+    accountSub: document.getElementById('accountSub'),
+    accountClose: document.getElementById('accountClose'),
+    accountRisk: document.getElementById('accountRisk'),
+    accountRiskBadge: document.getElementById('accountRiskBadge'),
+    accountRiskScore: document.getElementById('accountRiskScore'),
+    accountFlags: document.getElementById('accountFlags'),
+    accountProfile: document.getElementById('accountProfile'),
+    accountSiblingsBox: document.getElementById('accountSiblingsBox'),
+    accountSiblings: document.getElementById('accountSiblings'),
+    accountTrendBox: document.getElementById('accountTrendBox'),
+    accountHistoryBody: document.getElementById('accountHistoryBody'),
+    accountPostsBox: document.getElementById('accountPostsBox'),
+    accountPostsBody: document.getElementById('accountPostsBody'),
     confirmModal: document.getElementById('confirmModal'),
     confirmTitle: document.getElementById('confirmTitle'),
     confirmBody: document.getElementById('confirmBody'),
     confirmCancel: document.getElementById('confirmCancel'),
     confirmOk: document.getElementById('confirmOk')
   };
+
+  // Material icon paths are inlined instead of loaded from a font host: the
+  // dashboard stays local-only and icons stay crisp at any zoom.
+  var ICON_PATHS = {
+    dashboard: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
+    process: 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z',
+    table: 'M3 3h18v18H3V3zm2 4v4h6V7H5zm8 0v4h6V7h-6zM5 13v4h6v-4H5zm8 0v4h6v-4h-6z',
+    people: 'M16 11c1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 3-1.34 3-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z',
+    compare: 'M9 3L5 6.99h3V14h2V6.99h3L9 3zm7 14.01V10h-2v7.01h-3L15 21l4-3.99h-3z',
+    search: 'M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
+    settings: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
+    upload: 'M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z',
+    download: 'M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z',
+    database: 'M12 3C7.58 3 4 4.79 4 7v10c0 2.21 3.59 4 8 4s8-1.79 8-4V7c0-2.21-3.58-4-8-4zm0 2c3.87 0 6 1.5 6 2s-2.13 2-6 2-6-1.5-6-2 2.13-2 6-2zm6 12c0 .5-2.13 2-6 2s-6-1.5-6-2v-2.23c1.61.78 3.72 1.23 6 1.23s4.39-.45 6-1.23V17zm0-5c0 .5-2.13 2-6 2s-6-1.5-6-2v-2.23C7.61 10.55 9.72 11 12 11s4.39-.45 6-1.23V12z',
+    file: 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z',
+    refresh: 'M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z',
+    info: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z'
+  };
+
+  function svgIcon(name) {
+    var path = ICON_PATHS[name];
+    if (!path) return null;
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.setAttribute('class', 'icon');
+    var node = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    node.setAttribute('d', path);
+    svg.appendChild(node);
+    return svg;
+  }
+
+  var NAV_ICONS = {
+    navSummary: 'dashboard', navActivity: 'process', navData: 'table',
+    navSettings: 'settings'
+  };
+  var BUTTON_ICONS = {
+    openImportBtn: 'upload', openExportBtn: 'download', templateBtn: 'file',
+    openDatabaseBtn: 'database', dbDownloadBtn: 'download', dbRestoreBtn: 'refresh',
+    exportBtn: 'download', targetRetryBtn: 'refresh', accountVisitBtn: 'people',
+    emptyImportBtn: 'upload', activityImportBtn: 'upload', summaryImportBtn: 'upload',
+    targetResetBtn: 'refresh', accountResetBtn: 'refresh', accountRetryBtn: 'refresh',
+    offlineRetry: 'refresh'
+  };
+
+  // Menus and buttons get their icon from here, so markup stays free of
+  // decorative elements and a renamed button cannot lose its icon silently.
+  function decorateIcons() {
+    Object.keys(NAV_ICONS).forEach(function (id) {
+      var button = document.getElementById(id);
+      if (!button || button.querySelector('.icon')) return;
+      var svg = svgIcon(NAV_ICONS[id]);
+      if (svg) button.insertBefore(svg, button.firstChild);
+    });
+
+    Object.keys(BUTTON_ICONS).forEach(function (id) {
+      var button = document.getElementById(id);
+      if (!button || button.querySelector('.icon')) return;
+      var svg = svgIcon(BUTTON_ICONS[id]);
+      if (svg) button.insertBefore(svg, button.firstChild);
+    });
+  }
 
   var currentAuditId = (function () {
     var stored = localStorage.getItem(STORAGE_KEY);
@@ -141,17 +339,20 @@
   var pendingConfirm = null;
   var modalStack = [];
   var uploadInFlight = false;
+  var restoreInFlight = false;
   var lastSyncAt = null;
   var workerState = 'idle';
   var workerSeenLabel = '';
   var noticeDismissed = false;
-  var initialTab = 'targets';
+  var initialPage = 'summary';
+  var dataView = 'targets';
 
   var autoSelectAudit = !currentAuditId && localStorage.getItem(ALL_AUDITS_KEY) !== '1';
 
   var targetState = {
     status: '',
     platform: '',
+    issue: '',
     query: '',
     sort: 'recent',
     dir: 'desc',
@@ -165,9 +366,54 @@
     lastFetch: 0
   };
 
+  var accountState = {
+    level: '',
+    band: '',
+    platform: '',
+    query: '',
+    sort: 'risk',
+    dir: 'desc',
+    limit: 50,
+    offset: 0,
+    total: 0,
+    items: [],
+    clusters: [],
+    summary: null,
+    thresholds: null,
+    signature: '',
+    requestId: 0,
+    lastFetch: 0
+  };
+  var accountDetailRequest = 0;
+
+  var summaryState = {
+    data: null,
+    loading: false,
+    requestId: 0,
+    lastFetch: 0,
+    samples: []
+  };
+
+  var compareState = { data: null, loading: false, requestId: 0, lastFetch: 0, expanded: false };
+  var COMPARE_PREVIEW = 6;
+  var riskState = { items: [], loading: false, lastFetch: 0 };
+  var selectedTargets = new Set();
+  var searchState = { data: null, loading: false, requestId: 0 };
+
   var activitySort = { key: 'time', dir: 'desc' };
-  var activeTab = 'targets';
+  var activePage = 'summary';
+  var PAGES = ['summary', 'activity', 'targets', 'accounts', 'search', 'settings'];
+  var PAGE_MENU = {
+    summary: 'summary',
+    activity: 'activity',
+    targets: 'data',
+    accounts: 'data',
+    search: 'data',
+    settings: 'settings'
+  };
   var searchTimer = null;
+  var globalSearchTimer = null;
+  var accountSearchTimer = null;
   var previewRequest = 0;
 
   // ---------- Helpers ----------
@@ -302,8 +548,10 @@
     var td = make('td', 'status-cell');
     var status = item.status || 'PENDING';
     var meta = statusMeta(status);
-    var badge = make('span', 'badge ' + meta.cls, meta.label);
-    if (status === 'FAILED' && item.retry_count) badge.textContent = 'Gagal · ' + item.retry_count + 'x';
+    var badge = make('span', 'badge ' + meta.cls);
+    badge.appendChild(make('span', 'status-dot is-' + status));
+    badge.appendChild(document.createTextNode(
+      status === 'FAILED' && item.retry_count ? 'Gagal · ' + item.retry_count + 'x' : meta.label));
     if (item.error_message) badge.title = item.error_message;
     else if (status === 'PARTIAL') badge.title = 'Sebagian metrik tidak berhasil diambil.';
     else if (status === 'PENDING') badge.title = 'Menunggu worker memproses target ini.';
@@ -421,7 +669,7 @@
     el.workerPill.classList.toggle('is-busy', busy);
     el.workerPill.classList.toggle('is-stale', stale);
     el.workerPill.classList.toggle('is-idle', !busy && !stale);
-    el.workerPillText.textContent = busy ? 'Worker aktif' : 'Worker idle';
+    el.workerPillText.textContent = busy ? 'Worker aktif' : 'Worker siaga';
     el.workerPill.title = date
       ? 'Terakhir terlihat ' + timeRelative(seen)
       : 'Worker ekstensi belum pernah menghubungi backend';
@@ -441,20 +689,20 @@
       return;
     }
 
-    var since = workerSeenLabel ? ' (terakhir terlihat ' + workerSeenLabel + ')' : '';
-    el.workerNoticeText.textContent = formatNumber(queued) + ' target menunggu tetapi worker belum berjalan' + since +
-      '. Buka ekstensi sunscraping di Chrome, lalu klik Mulai worker.';
+    var since = workerSeenLabel ? ' · terakhir ' + workerSeenLabel : '';
+    el.workerNoticeText.textContent = formatNumber(queued) + ' menunggu · worker belum berjalan' + since;
+    el.workerNoticeText.title = 'Buka ekstensi sunscraping, lalu klik Mulai worker agar antrean diproses.';
     el.workerNotice.hidden = false;
   }
 
   function renderLastSync() {
-    if (!el.lastSync) return;
+    if (!el.activitySync) return;
     if (!lastSyncAt) {
-      el.lastSync.textContent = '';
+      el.activitySync.textContent = '';
       return;
     }
     var diff = Math.round((Date.now() - lastSyncAt) / 1000);
-    el.lastSync.textContent = diff < 10
+    el.activitySync.textContent = diff < 10
       ? 'diperbarui baru saja'
       : diff < 120 ? 'diperbarui ' + diff + ' detik lalu'
       : 'diperbarui ' + Math.round(diff / 60) + ' menit lalu';
@@ -509,12 +757,13 @@
 
     if (currentAuditId && !selectedAudit()) {
       currentAuditId = null;
-      localStorage.removeItem(STORAGE_KEY);
       autoSelectAudit = true;
     }
 
+    // One audit is always in scope: a queue, a recap and an export read better
+    // with a named scope than with an "all audits" bucket.
     var autoSelected = false;
-    if (!currentAuditId && autoSelectAudit && audits.length) {
+    if (!currentAuditId && audits.length) {
       currentAuditId = Number(audits[0].id);
       localStorage.setItem(STORAGE_KEY, String(currentAuditId));
       autoSelectAudit = false;
@@ -533,12 +782,10 @@
 
   function rebuildAuditOptions() {
     var fragment = document.createDocumentFragment();
-    var all = make('option', null, 'Semua audit');
-    all.value = '';
-    fragment.appendChild(all);
 
     audits.forEach(function (audit) {
-      var option = make('option', null, audit.name);
+      var option = make('option', null,
+        (audit.period ? monthLabel(audit.period) + ' · ' : '') + audit.name);
       option.value = String(audit.id);
       fragment.appendChild(option);
     });
@@ -560,11 +807,13 @@
       meta.textContent = audits.length
         ? audits.length + ' audit · ' + formatNumber(totalTargets) + ' target'
         : 'Belum ada audit. Impor file untuk memulai.';
+      if (el.auditCost) el.auditCost.hidden = true;
+      if (el.rerunCost) el.rerunCost.hidden = true;
       el.rerunBtn.disabled = true;
-      el.settingsBtn.disabled = true;
+      el.rerunFullBtn.disabled = true;
       el.deleteAuditBtn.disabled = true;
       el.rerunBtn.title = 'Pilih satu audit untuk menjalankan ulang';
-      el.settingsBtn.title = 'Pengaturan berlaku per audit — pilih satu audit dulu';
+      el.rerunFullBtn.title = 'Pilih satu audit untuk mendaur ulang semua target';
       el.deleteAuditBtn.title = 'Pilih audit yang akan dihapus';
       updateManageNote(false);
       updateExportUi();
@@ -574,38 +823,91 @@
 
     if (!audit) {
       meta.textContent = 'Audit tidak ditemukan.';
+      if (el.auditCost) el.auditCost.hidden = true;
+      if (el.rerunCost) el.rerunCost.hidden = true;
       el.rerunBtn.disabled = true;
-      el.settingsBtn.disabled = true;
+      el.rerunFullBtn.disabled = true;
       el.deleteAuditBtn.disabled = true;
       el.rerunBtn.title = 'Pilih satu audit yang ada untuk menjalankan ulang';
-      el.settingsBtn.title = 'Pengaturan berlaku per audit — pilih satu audit dulu';
       el.deleteAuditBtn.title = 'Pilih audit yang akan dihapus';
       updateManageNote(false);
       updateRetryButton();
       return;
     }
 
-    var parts = [];
-    parts.push(formatNumber(audit.target_count) + ' target');
+    var parts = [audit.name, formatNumber(audit.target_count) + ' target'];
     parts.push(audit.repeat_days > 0 ? 'otomatis tiap ' + audit.repeat_days + ' hari' : 'manual');
     if (audit.last_run_at) parts.push('terakhir ' + timeRelative(audit.last_run_at));
-    if (audit.repeat_days > 0 && audit.next_due_at) {
-      parts.push('jadwal berikutnya ' + timeRelative(audit.next_due_at));
+    // Context only: name, batch size, last run. Cost and schedule live in their
+    // own chip so this line stays readable instead of becoming a paragraph.
+    meta.textContent = parts.join(' · ');
+    meta.title = audit.over_budget
+      ? 'Melebihi budget ' + formatNumber(audit.visit_budget) + ' kunjungan per siklus; worker berhenti di angka itu.'
+      : '';
+
+    if (el.auditCost) {
+      var cost = [];
+      if (audit.visit_estimate !== undefined && audit.visit_estimate !== null) {
+        cost.push('±' + formatNumber(audit.visit_estimate) + ' kunjungan');
+      }
+      if (audit.repeat_days > 0 && audit.next_due_at) {
+        cost.push('jadwal ' + timeRelative(audit.next_due_at));
+      }
+      el.auditCost.hidden = cost.length === 0;
+      el.auditCost.textContent = cost.join(' · ');
+      el.auditCost.title = audit.cached_targets
+        ? formatNumber(audit.cached_targets) + ' tautan sudah terukur dan tidak perlu profil ulang'
+        : 'Perkiraan jumlah halaman yang akan dibuka worker';
     }
 
-    meta.textContent = audit.name + ' · ' + parts.join(' · ');
+    if (el.rerunCost) {
+      var estimate = audit.visit_estimate;
+      el.rerunCost.hidden = estimate === undefined || estimate === null;
+      el.rerunCost.textContent = 'Audit ulang penuh: ±' + formatNumber(estimate) +
+        ' kunjungan · Ulangi target gagal hanya menyentuh baris yang gagal pada siklus ini.';
+    }
+
+    // Audits arrive after the first page render, so a deep link to Settings used
+    // to show empty fields until the reader navigated away and back.
+    if (activePage === 'settings') fillSettingsForm();
 
     var busy = Number(audit.pending_count) > 0 || Number(audit.running_count) > 0;
     el.rerunBtn.disabled = busy;
     el.rerunBtn.title = busy
       ? 'Selesaikan antrean audit ini sebelum menjadwalkan ulang'
-      : 'Jadwalkan ulang semua target di audit ini';
-    el.settingsBtn.disabled = false;
+      : 'Hanya target yang belum punya angka (hemat kunjungan)';
+    el.rerunFullBtn.disabled = busy;
+    el.rerunFullBtn.title = busy
+      ? 'Selesaikan antrean audit ini sebelum menjadwalkan ulang'
+      : 'Daur ulang seluruh target, termasuk yang sudah terverifikasi';
     el.deleteAuditBtn.disabled = false;
     updateManageNote(true);
     updateExportUi();
 
     updateRetryButton();
+  }
+
+  function updateBatchBar() {
+    if (!el.targetBatch) return;
+    var count = selectedTargets.size;
+    var show = count > 0 && activePage === 'targets';
+    el.targetBatch.hidden = !show;
+    if (el.targetBatchCount) el.targetBatchCount.textContent = formatNumber(count) + ' dipilih';
+    if (el.targetBatchRetry) el.targetBatchRetry.disabled = count === 0;
+  }
+
+  function syncSelectAll() {
+    if (!el.targetSelectAll || !el.targetBody) return;
+    var boxes = Array.prototype.slice.call(
+      el.targetBody.querySelectorAll('tr[data-target-id] input[type="checkbox"]'));
+    if (!boxes.length) {
+      el.targetSelectAll.checked = false;
+      el.targetSelectAll.indeterminate = false;
+      return;
+    }
+    var checked = boxes.filter(function (box) { return box.checked; }).length;
+    el.targetSelectAll.checked = checked === boxes.length;
+    el.targetSelectAll.indeterminate = checked > 0 && checked < boxes.length;
   }
 
   function updateRetryButton() {
@@ -614,27 +916,768 @@
     el.retryFailedBtn.title = !currentAuditId
       ? 'Pilih satu audit untuk mengulang target gagal'
       : failed === 0 ? 'Tidak ada target gagal pada audit ini' : 'Jadwalkan ulang ' + failed + ' target gagal';
+
+    // The same action sits beside the number it acts on: a failure should not
+    // require opening Settings just to be retried.
+    if (el.processRetryBtn) {
+      var show = Boolean(currentAuditId) && failed > 0;
+      el.processRetryBtn.hidden = !show;
+      el.processRetryBtn.disabled = !show;
+      el.processRetryBtn.textContent = 'Ulangi ' + formatNumber(failed) + ' gagal';
+      el.processRetryBtn.title = 'Jadwalkan ulang ' + formatNumber(failed) + ' target gagal pada audit ini';
+    }
   }
 
   function renderStats(stats) {
     stats = stats || {};
     lastStats = stats;
-    el.statPending.textContent = formatNumber(stats.PENDING || 0);
-    el.statRunning.textContent = formatNumber(stats.RUNNING || 0);
-    el.statOk.textContent = formatNumber(stats.OK || 0);
-    el.statPartial.textContent = formatNumber(stats.PARTIAL || 0);
-    el.statFailed.textContent = formatNumber(stats.FAILED || 0);
-    el.statFailed.classList.toggle('is-danger', Number(stats.FAILED) > 0);
-
+    var counts = {
+      PENDING: Number(stats.PENDING) || 0,
+      RUNNING: Number(stats.RUNNING) || 0,
+      OK: Number(stats.OK) || 0,
+      PARTIAL: Number(stats.PARTIAL) || 0,
+      FAILED: Number(stats.FAILED) || 0
+    };
+    el.statPending.textContent = formatNumber(counts.PENDING);
+    el.statRunning.textContent = formatNumber(counts.RUNNING);
+    el.statOk.textContent = formatNumber(counts.OK);
+    el.statPartial.textContent = formatNumber(counts.PARTIAL);
+    el.statFailed.textContent = formatNumber(counts.FAILED);
+    el.statFailed.classList.toggle('is-danger', counts.FAILED > 0);
     el.summaryItems.forEach(function (item) {
-      var key = String(item.getAttribute('data-stat') || '').toUpperCase();
-      item.hidden = Number(stats[key] || 0) === 0;
+      item.classList.toggle('is-zero', !counts[(item.dataset.stat || '').toUpperCase()]);
     });
+    renderProcessProgress(counts);
 
+    // Every count stays on screen, including the zeros: a strip that grows and
+    // shrinks as the queue drains cannot be compared before and after.
     renderWorker(stats.WORKER_LAST_SEEN);
+    if (el.settingsWorker) {
+      el.settingsWorker.textContent = stats.WORKER_LAST_SEEN
+        ? 'Terakhir menghubungi backend ' + timeRelative(stats.WORKER_LAST_SEEN) + '.'
+        : 'Belum ada worker yang menghubungi backend sejak aplikasi dijalankan.';
+    }
     updateRetryButton();
     updateAuditMeta();
     updateExportUi();
+  }
+
+  // One bar answers "how far along is this run?" before the reader parses five
+  // separate numbers; the counts below stay so progress can be compared.
+  function renderProcessProgress(counts) {
+    var total = counts.PENDING + counts.RUNNING + counts.OK + counts.PARTIAL + counts.FAILED;
+    var done = counts.OK + counts.PARTIAL;
+    if (el.processProgress) {
+      el.processProgress.textContent = total ? Math.round(done * 100 / total) + '%' : '0%';
+    }
+    if (el.processSub) {
+      el.processSub.textContent = total
+        ? formatNumber(done) + ' dari ' + formatNumber(total) + ' target sudah diperiksa · ' +
+          formatNumber(counts.PENDING + counts.RUNNING) + ' belum'
+        : 'Belum ada target pada audit ini.';
+    }
+    if (!el.processBar) return;
+    var fragment = document.createDocumentFragment();
+    [['ok', counts.OK], ['partial', counts.PARTIAL], ['running', counts.RUNNING],
+      ['pending', counts.PENDING], ['failed', counts.FAILED]].forEach(function (pair) {
+      if (!total || !pair[1]) return;
+      var segment = make('span', 'status-seg is-' + pair[0]);
+      segment.style.width = (pair[1] * 100 / total) + '%';
+      segment.title = formatNumber(pair[1]) + ' target';
+      fragment.appendChild(segment);
+    });
+    el.processBar.replaceChildren(fragment);
+  }
+
+  // ---------- Recap ----------
+  function handleFromUrl(url) {
+    if (!url) return '';
+    var text = String(url);
+    var tiktok = text.match(/tiktok\.com\/(?:@|%40)([A-Za-z0-9._]{2,30})/i);
+    if (tiktok) return tiktok[1];
+    var instagram = text.match(/instagram\.com\/([A-Za-z0-9._]{2,30})\/(?:p|reels?|tv)\//i);
+    return instagram ? instagram[1] : '';
+  }
+
+  function targetHandle(item) {
+    // A link that names its owner is evidence; the sheet label is only a claim.
+    return handleFromUrl(item.url) || item.username || '';
+  }
+
+  function erMissingReason(item) {
+    if (item.platform === 'tiktok') {
+      return item.views
+        ? 'ER belum dihitung untuk baris ini.'
+        : 'Views belum terbaca, jadi ER TikTok tidak bisa dihitung.';
+    }
+    if (!item.follower_count) {
+      return 'Followers akun belum terukur (butuh kunjungan profil), jadi ER Instagram tidak bisa dihitung.';
+    }
+    return 'ER belum dihitung untuk baris ini.';
+  }
+
+  function formatDuration(hours) {
+    var minutes = Math.round(hours * 60);
+    if (minutes < 60) return Math.max(1, minutes) + ' menit';
+    var rest = minutes % 60;
+    return Math.floor(minutes / 60) + ' jam' + (rest ? ' ' + rest + ' menit' : '');
+  }
+
+  function trackThroughput(stats) {
+    var done = (Number(stats.OK) || 0) + (Number(stats.PARTIAL) || 0) + (Number(stats.FAILED) || 0);
+    var samples = summaryState.samples;
+    var now = Date.now();
+    var last = samples[samples.length - 1];
+    if (last && last.done === done && now - last.at < 120000) return;
+    samples.push({ at: now, done: done });
+    while (samples.length > 60) samples.shift();
+    var cutoff = now - 30 * 60000;
+    while (samples.length > 2 && samples[0].at < cutoff) samples.shift();
+  }
+
+  function throughputPerHour() {
+    var samples = summaryState.samples;
+    if (samples.length < 2) return null;
+    var first = samples[0];
+    var last = samples[samples.length - 1];
+    var hours = (last.at - first.at) / 3600000;
+    if (hours <= 0 || last.done <= first.done) return null;
+    return (last.done - first.done) / hours;
+  }
+
+  function loadSummary(force) {
+    if (!el.summaryBody) return;
+    if (summaryState.loading) return;
+    if (!force && Date.now() - summaryState.lastFetch < SUMMARY_REFRESH_MS) return;
+    summaryState.loading = true;
+    var requestId = ++summaryState.requestId;
+    fetchJson('/api/summary' + auditQuery()).then(function (data) {
+      if (requestId !== summaryState.requestId) return;
+      summaryState.data = data;
+      summaryState.lastFetch = Date.now();
+      renderSummary();
+    }).catch(function () {
+      if (summaryState.lastFetch) return;
+      if (el.summarySkeleton) el.summarySkeleton.hidden = true;
+      el.summaryBody.hidden = true;
+      el.summaryEmpty.hidden = false;
+      el.summaryEmptyCopy.textContent = 'Dashboard tidak bisa dimuat. Periksa koneksi ke backend lalu coba lagi.';
+    }).finally(function () {
+      summaryState.loading = false;
+    });
+  }
+
+  function kpiCard(label, value, sub, rows) {
+    var card = make('div', 'kpi');
+    card.appendChild(make('span', 'kpi-label', label));
+    if (rows && rows.length) {
+      // A metric whose meaning differs per platform gets one row per platform
+      // instead of a single headline number picked by link count.
+      var list = make('div', 'kpi-rows');
+      rows.forEach(function (row) {
+        var line = make('div', 'kpi-row');
+        line.appendChild(make('span', 'kpi-row-label', row.label));
+        var val = make('span', 'kpi-row-value', row.value);
+        if (row.lowSample) val.classList.add('is-warn');
+        line.appendChild(val);
+        if (row.note) line.title = row.note;
+        list.appendChild(line);
+      });
+      card.appendChild(list);
+    } else {
+      card.appendChild(make('div', 'kpi-value', value));
+    }
+    if (sub) card.appendChild(make('span', 'kpi-sub', sub));
+    return card;
+  }
+
+  function recapCell(text, className) {
+    return make('td', className || null,
+      text === null || text === undefined || text === '' ? '—' : text);
+  }
+
+  function recapEmptyRow(tbody, columns, message) {
+    var tr = make('tr');
+    var td = make('td', 'recap-empty', message);
+    td.colSpan = columns;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+  }
+
+  function recapAccountCell(item) {
+    var td = make('td', 'account-cell');
+    var line = make('span', 'account-line');
+    line.appendChild(platformDot(item.platform));
+    var recapHandle = handleFromUrl(item.url) || item.username;
+    var label = recapHandle ? '@' + recapHandle : (item.handle || '—');
+    if (item.url) {
+      var link = make('a', 'account recap-link', label);
+      link.href = item.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      line.appendChild(link);
+    } else {
+      line.appendChild(make('span', 'account', label));
+    }
+    td.appendChild(line);
+    return td;
+  }
+
+  function renderSummary() {
+    var data = summaryState.data;
+    if (!data || !data.kpi) return;
+    var kpi = data.kpi;
+    var totals = kpi.totals || {};
+    var limits = data.limits || {};
+    var minRows = Number(limits.min_er_rows) || 2;
+
+    if (el.summarySkeleton) el.summarySkeleton.hidden = true;
+
+    if (!kpi.targets) {
+      el.summaryBody.hidden = true;
+      el.summaryEmpty.hidden = false;
+      el.summaryEmptyCopy.textContent = 'Belum ada target pada audit ini. Impor daftar link untuk mulai mengaudit.';
+      return;
+    }
+
+    el.summaryBody.hidden = false;
+    el.summaryEmpty.hidden = true;
+
+    var platforms = data.platforms || [];
+    var erRows = platforms.map(function (item) {
+      return {
+        label: platformLabel(item.platform),
+        value: formatEr(item.median_er),
+        lowSample: item.median_er !== null && item.er_rows < minRows,
+        note: item.median_er === null
+          ? 'Belum ada baris dengan penyebut lengkap; ER belum bisa dihitung.'
+          : 'Median dari ' + formatNumber(item.er_rows) + ' baris' +
+            (item.er_rows < minRows ? ' — sampel kecil, baca sebagai indikasi.' : '.')
+      };
+    });
+
+    // Four totals and nothing decorative: everything else lives in the tables
+    // below, which is where a monthly check is actually read.
+    var statusCounts = data.status || {};
+    el.summaryKpi.replaceChildren();
+    el.summaryKpi.appendChild(kpiCard('Target diaudit', formatNumber(kpi.targets),
+      'Menunggu ' + formatNumber(statusCounts.PENDING || 0) + ' · Berjalan ' + formatNumber(statusCounts.RUNNING || 0)));
+    el.summaryKpi.appendChild(kpiCard('Terverifikasi', formatNumber(kpi.verified),
+      'Selesai ' + formatNumber(statusCounts.OK || 0) + ' · Sebagian ' + formatNumber(statusCounts.PARTIAL || 0) +
+      ' · Gagal ' + formatNumber(statusCounts.FAILED || 0)));
+    el.summaryKpi.appendChild(kpiCard('Total views', formatNumber(totals.views || 0),
+      formatNumber(totals.likes || 0) + ' likes · ' + formatNumber(totals.comments || 0) + ' komentar · ' + formatNumber(totals.shares || 0) + ' share'));
+    el.summaryKpi.appendChild(kpiCard('Median ER', '—',
+      erRows.length ? null : 'Butuh followers (IG) atau views (TikTok)', erRows));
+
+    // One short label on screen; the technical window stays in the tooltip so a
+    // timestamp never competes with the numbers it describes.
+    el.summaryStamp.textContent = data.generated_at ? 'Diperbarui ' + timeRelative(data.generated_at) : '';
+    el.summaryStamp.title = kpi.first_scraped_at
+      ? 'Rekap ' + formatDateTime(data.generated_at) + '\nData ' + formatDateTime(kpi.first_scraped_at) +
+        ' sampai ' + formatDateTime(kpi.last_scraped_at)
+      : '';
+
+    var remaining = (Number(statusCounts.PENDING) || 0) + (Number(statusCounts.RUNNING) || 0);
+    if (el.qaProcess) {
+      var rate = throughputPerHour();
+      el.qaProcess.title = remaining
+        ? 'Perkiraan ' + (rate && rate > 0 ? formatDuration(remaining / rate) : 'belum terukur') + ' lagi'
+        : 'Semua target sudah diproses';
+    }
+    if (el.qaProcess) {
+      el.qaProcess.replaceChildren(document.createTextNode(
+        remaining ? 'Lihat proses · ' + formatNumber(remaining) + ' tersisa' : 'Lihat proses'));
+      var qaArrow = make('span', null, '→');
+      qaArrow.setAttribute('aria-hidden', 'true');
+      el.qaProcess.appendChild(qaArrow);
+    }
+
+    var quality = data.quality || {};
+    var qualityItems = [
+      ['without_followers', 'Tanpa followers', 'Akun yang followers-nya belum pernah terukur. ER Instagram membutuhkan angka ini.'],
+      ['partial', 'Sebagian terbaca', 'Akun yang setidaknya satu unggahannya hanya terbaca sebagian.'],
+      ['missing_views', 'TikTok tanpa views', 'Akun TikTok yang views-nya belum terbaca. Instagram tidak menampilkan views, jadi tidak dihitung.'],
+      ['missing_username', 'Tanpa handle', 'Akun yang tautannya tidak memuat handle, jadi ditampilkan sebagai URL.'],
+      ['never_scraped', 'Belum diproses', 'Akun yang belum punya satu pun snapshot.']
+    ];
+    el.summaryQuality.replaceChildren();
+    qualityItems.forEach(function (entry) {
+      var value = Number(quality[entry[0]]) || 0;
+      var li = make('li', 'quality-item');
+      // A zero stays visible but recedes: the reader looks for the non-zero gaps,
+      // not for a sentence explaining what a gap means.
+      li.classList.toggle('is-clear', !value);
+      li.title = entry[2];
+      li.appendChild(make('span', 'quality-value' + (value ? ' is-warn' : ''), formatNumber(value)));
+      li.appendChild(make('span', 'quality-label', entry[1]));
+      el.summaryQuality.appendChild(li);
+    });
+
+    el.summaryPlatformBody.replaceChildren();
+    platforms.forEach(function (item) {
+      var tr = make('tr');
+      tr.appendChild(recapCell(platformLabel(item.platform)));
+      tr.appendChild(recapCell(formatNumber(item.targets), 'num'));
+      tr.appendChild(recapCell(formatNumber(item.ok + item.partial), 'num'));
+      tr.appendChild(recapCell(formatNumber(item.views), 'num'));
+      tr.appendChild(recapCell(formatNumber(item.likes), 'num col-likes'));
+      tr.appendChild(recapCell(formatNumber(item.comments), 'num col-comments'));
+      tr.appendChild(recapCell(formatNumber(item.shares), 'num col-share'));
+      var erTd = make('td', 'num');
+      erTd.appendChild(make('span', 'metric-value', formatEr(item.median_er)));
+      if (item.median_er !== null && item.er_rows < minRows) {
+        erTd.appendChild(make('span', 'metric-sub is-warn', 'n=' + item.er_rows));
+      }
+      tr.appendChild(erTd);
+      el.summaryPlatformBody.appendChild(tr);
+    });
+    if (!platforms.length) {
+      recapEmptyRow(el.summaryPlatformBody, 8, 'Belum ada platform yang terbaca.');
+    }
+
+    var topViews = (data.posts && data.posts.top_views) || [];
+    el.summaryTopViewsBody.replaceChildren();
+    topViews.forEach(function (post) {
+      var tr = make('tr');
+      tr.appendChild(recapAccountCell(post));
+      tr.appendChild(recapCell(formatNumber(post.views), 'num'));
+      tr.appendChild(recapCell(formatNumber(post.likes), 'num'));
+      tr.appendChild(recapCell(formatEr(post.er), 'num'));
+      el.summaryTopViewsBody.appendChild(tr);
+    });
+    if (!topViews.length) {
+      recapEmptyRow(el.summaryTopViewsBody, 4, 'Belum ada views yang terbaca.');
+    }
+    // An empty leaderboard is noise on a summary page; drop the whole card.
+    if (el.summaryTopViewsCard) el.summaryTopViewsCard.hidden = !topViews.length;
+
+    var topEr = (data.posts && data.posts.top_er) || [];
+    el.summaryTopErBody.replaceChildren();
+    topEr.forEach(function (post) {
+      var tr = make('tr');
+      tr.appendChild(recapAccountCell(post));
+      tr.appendChild(recapCell(formatEr(post.er), 'num'));
+      tr.appendChild(recapCell(formatNumber(post.views), 'num'));
+      tr.appendChild(recapCell(formatNumber(post.likes), 'num'));
+      el.summaryTopErBody.appendChild(tr);
+    });
+    if (!topEr.length) {
+      recapEmptyRow(el.summaryTopErBody, 4, 'ER belum bisa dihitung: followers/views belum lengkap.');
+    }
+    if (el.summaryTopErCard) el.summaryTopErCard.hidden = !topEr.length;
+
+    var temas = (data.temas || []).filter(function (item) {
+      return item.tema !== '(tanpa tema)';
+    });
+    if (el.summaryTemaCard) {
+      el.summaryTemaCard.hidden = temas.length === 0;
+      el.summaryTemaBody.replaceChildren();
+      temas.forEach(function (item) {
+        var tr = make('tr');
+        tr.appendChild(recapCell(item.tema));
+        tr.appendChild(recapCell(formatNumber(item.targets), 'num'));
+        tr.appendChild(recapCell(formatNumber(item.views), 'num'));
+        tr.appendChild(recapCell(formatEr(item.median_er), 'num'));
+        el.summaryTemaBody.appendChild(tr);
+      });
+    }
+
+    var auditList = data.audits || [];
+    if (el.summaryAuditCard) {
+      el.summaryAuditCard.hidden = auditList.length < 2;
+      el.summaryAuditBody.replaceChildren();
+      auditList.forEach(function (item) {
+        var tr = make('tr');
+        tr.appendChild(recapCell(item.name));
+        tr.appendChild(recapCell(formatNumber(item.targets), 'num'));
+        tr.appendChild(recapCell(formatNumber(item.ok + item.partial), 'num'));
+        tr.appendChild(recapCell(formatNumber(item.pending), 'num'));
+        tr.appendChild(recapCell(formatNumber(item.views), 'num'));
+        tr.appendChild(recapCell(formatEr(item.median_er), 'num'));
+        el.summaryAuditBody.appendChild(tr);
+      });
+    }
+
+    // Definitions live in the quality/ER popovers; a paragraph in the scroll path
+    // is the opposite of an overview page.
+    el.summaryFootnote.hidden = true;
+    el.summaryFootnote.textContent = '';
+  }
+
+  if (el.summaryImportBtn) {
+    el.summaryImportBtn.addEventListener('click', openImportModal);
+  }
+
+  if (el.qaProcess) el.qaProcess.addEventListener('click', function () { setPage('activity'); });
+  if (el.qaAccounts) el.qaAccounts.addEventListener('click', function () { setDataView('accounts'); });
+  if (el.qaExport) el.qaExport.addEventListener('click', openExportModal);
+  if (el.summaryRiskAll) el.summaryRiskAll.addEventListener('click', function () { setDataView('accounts'); });
+
+  if (el.qualityInfoBtn) {
+    el.qualityInfoBtn.addEventListener('click', function () {
+      var open = el.qualityInfo.hidden;
+      el.qualityInfo.hidden = !open;
+      el.qualityInfoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      el.qualityInfoBtn.classList.toggle('is-active', open);
+    });
+  }
+
+  function showTopTargets(key) {
+    setDataView('targets');
+    targetState.sort = key;
+    targetState.dir = 'desc';
+    targetState.offset = 0;
+    targetState.signature = '';
+    loadTargets(true);
+  }
+
+  if (el.topViewsAll) el.topViewsAll.addEventListener('click', function () { showTopTargets('views'); });
+  if (el.topErAll) el.topErAll.addEventListener('click', function () { showTopTargets('er'); });
+
+  if (el.targetSelectAll) {
+    el.targetSelectAll.addEventListener('change', function () {
+      var checked = el.targetSelectAll.checked;
+      Array.prototype.forEach.call(
+        el.targetBody.querySelectorAll('tr[data-target-id]'),
+        function (row) {
+          var box = row.querySelector('input[type="checkbox"]');
+          if (!box) return;
+          box.checked = checked;
+          var id = Number(row.dataset.targetId);
+          if (checked) selectedTargets.add(id); else selectedTargets.delete(id);
+        });
+      updateBatchBar();
+    });
+  }
+
+  if (el.targetBatchClear) {
+    el.targetBatchClear.addEventListener('click', function () {
+      selectedTargets.clear();
+      Array.prototype.forEach.call(
+        el.targetBody.querySelectorAll('input[type="checkbox"]'),
+        function (box) { box.checked = false; });
+      if (el.targetSelectAll) {
+        el.targetSelectAll.checked = false;
+        el.targetSelectAll.indeterminate = false;
+      }
+      updateBatchBar();
+    });
+  }
+
+  if (el.targetBatchRetry) {
+    el.targetBatchRetry.addEventListener('click', async function () {
+      if (!currentAuditId || !selectedTargets.size) return;
+      var count = selectedTargets.size;
+      var confirmed = await askConfirm({
+        title: 'Ulangi ' + formatNumber(count) + ' target terpilih?',
+        body: 'Target terpilih akan diantrekan untuk kunjungan baru. Angka lama tetap tersimpan sampai hasil baru masuk.',
+        confirmLabel: 'Ulangi target'
+      });
+      if (!confirmed) return;
+      el.targetBatchRetry.disabled = true;
+      try {
+        var data = await postJson('/api/targets/retry', {
+          audit_id: currentAuditId,
+          target_ids: Array.from(selectedTargets)
+        });
+        toast('success', data.message || 'Target dijadwalkan ulang.');
+        selectedTargets.clear();
+        updateBatchBar();
+        loadTargets(false);
+        pollOnce();
+      } catch (error) {
+        if (!unauthorizedShown) toast('error', error.message || 'Gagal menjadwalkan ulang.');
+      } finally {
+        el.targetBatchRetry.disabled = false;
+      }
+    });
+  }
+
+  // ---------- Monthly comparison ----------
+  function monthLabel(period) {
+    if (!period || String(period).length < 7) return period || '—';
+    var names = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+    var index = Number(String(period).slice(5, 7)) - 1;
+    return (names[index] || period) + ' ' + String(period).slice(0, 4);
+  }
+
+  function loadCompare(force) {
+    if (!el.compareBody || compareState.loading) return;
+    if (!force && Date.now() - compareState.lastFetch < COMPARE_REFRESH_MS) return;
+    compareState.loading = true;
+    var requestId = ++compareState.requestId;
+    var months = el.compareMonths ? el.compareMonths.value : '6';
+    fetchJson('/api/compare?months=' + encodeURIComponent(months)).then(function (data) {
+      if (requestId !== compareState.requestId) return;
+      compareState.data = data;
+      compareState.lastFetch = Date.now();
+      renderCompare();
+    }).catch(function () {
+      if (!unauthorizedShown) toast('error', 'Perbandingan bulanan tidak bisa dimuat.');
+    }).finally(function () {
+      compareState.loading = false;
+    });
+  }
+
+  // Risk is corpus-wide (all audits), which is exactly what coordination checks
+  // need; it runs on its own throttle instead of riding every summary refresh.
+  function loadRisk(force) {
+    if (!el.summaryRiskCard) return;
+    if (riskState.loading) return;
+    if (!force && Date.now() - riskState.lastFetch < 60000) return;
+    riskState.loading = true;
+    fetchJson('/api/accounts?sort=risk&dir=desc&limit=12').then(function (data) {
+      riskState.items = Array.isArray(data.items) ? data.items : [];
+      riskState.lastFetch = Date.now();
+      renderRisk();
+    }).catch(function () {
+      el.summaryRiskCard.hidden = true;
+    }).finally(function () {
+      riskState.loading = false;
+    });
+  }
+
+  function renderRisk() {
+    if (!el.summaryRiskCard || !el.summaryRiskList) return;
+    var flagged = riskState.items.filter(function (item) { return Number(item.score) > 0; });
+    var top = flagged.slice(0, 5);
+    el.summaryRiskCard.hidden = top.length === 0;
+    el.summaryRiskList.replaceChildren();
+    if (!top.length) return;
+    top.forEach(function (item) {
+      var li = make('li');
+      var row = make('button', 'risk-row');
+      row.type = 'button';
+      row.appendChild(make('span', 'risk-handle', '@' + (item.username || item.key)));
+      var meta = levelMeta(item.level);
+      row.appendChild(make('span', 'badge ' + meta.cls, meta.label));
+      var labels = (item.flags || []).map(function (flag) { return flag.label; }).join(' · ');
+      row.appendChild(make('span', 'risk-flags', labels || 'Tanpa sinyal rinci'));
+      row.appendChild(make('span', 'risk-score', item.score + ' poin'));
+      row.title = labels || 'Buka detail akun';
+      row.addEventListener('click', function () { openAccountDetail(item.key); });
+      li.appendChild(row);
+      el.summaryRiskList.appendChild(li);
+    });
+    if (el.summaryRiskCount) {
+      el.summaryRiskCount.textContent = flagged.length > top.length
+        ? 'menampilkan ' + top.length + ' dari ' + formatNumber(flagged.length) + ' akun'
+        : formatNumber(flagged.length) + ' akun';
+    }
+  }
+
+  function renderCompare() {
+    var data = compareState.data;
+    if (!data) return;
+    var periods = data.periods || [];
+
+    el.compareHead.replaceChildren();
+    var headRow = make('tr');
+    var accountTh = make('th', null, 'Akun');
+    accountTh.scope = 'col';
+    headRow.appendChild(accountTh);
+    periods.forEach(function (period) {
+      var th = make('th', 'compare-month', monthLabel(period));
+      th.scope = 'col';
+      headRow.appendChild(th);
+    });
+    el.compareHead.appendChild(headRow);
+
+    // Ten rows answer "who changed this month"; the other thirty turn the only
+    // overview page into a four-screen scroll, so they wait behind a button.
+    var allAccounts = data.accounts || [];
+    var visibleAccounts = compareState.expanded ? allAccounts : allAccounts.slice(0, COMPARE_PREVIEW);
+    el.compareBody.replaceChildren();
+    visibleAccounts.forEach(function (account) {
+      var tr = make('tr');
+      var accountTd = make('td', 'account-cell');
+      var line = make('span', 'account-line');
+      line.appendChild(platformDot(account.platform));
+      line.appendChild(make('span', 'account',
+        account.username ? '@' + account.username : (account.handle || '—')));
+      accountTd.appendChild(line);
+      if (account.is_new) {
+        accountTd.appendChild(make('span', 'account-sub', 'baru bulan ini'));
+      } else if (account.missing_latest) {
+        accountTd.appendChild(make('span', 'account-sub is-warn', 'tidak mengirim tautan bulan ini'));
+      }
+      tr.appendChild(accountTd);
+
+      periods.forEach(function (period) {
+        var cell = account.months[period];
+        var td = make('td', 'compare-cell');
+        if (!cell) {
+          td.appendChild(make('span', 'compare-missing', 'tidak ada kiriman'));
+        } else {
+          td.appendChild(make('span', 'compare-values', formatNumber(cell.views) + ' views'));
+          td.appendChild(make('span', 'compare-sub',
+            formatNumber(cell.posts) + ' post · ER ' + formatEr(cell.median_er)));
+          td.appendChild(make('span', 'compare-sub',
+            cell.followers ? formatNumber(cell.followers) + ' followers' : 'followers belum terukur'));
+        }
+        tr.appendChild(td);
+      });
+      el.compareBody.appendChild(tr);
+    });
+
+    if (!allAccounts.length) {
+      var emptyRow = make('tr');
+      var emptyTd = make('td', 'recap-empty', 'Belum ada data bulanan. Impor batch pertama untuk memulai.');
+      emptyTd.colSpan = Math.max(2, periods.length + 1);
+      emptyRow.appendChild(emptyTd);
+      el.compareBody.appendChild(emptyRow);
+    }
+
+    if (el.compareMore) {
+      el.compareMore.hidden = allAccounts.length <= COMPARE_PREVIEW;
+      el.compareMore.textContent = compareState.expanded
+        ? 'Ringkas ke ' + COMPARE_PREVIEW + ' akun'
+        : 'Tampilkan semua ' + formatNumber(allAccounts.length) + ' akun';
+    }
+
+    // One bar per period: the monthly trend is visible before reading a cell.
+    if (el.compareBars) {
+      var totals = periods.map(function (period) {
+        var total = 0;
+        (data.accounts || []).forEach(function (account) {
+          var cell = account.months && account.months[period];
+          if (cell) total += Number(cell.views) || 0;
+        });
+        return { period: period, views: total };
+      });
+      var maxTotal = totals.reduce(function (max, item) { return Math.max(max, item.views); }, 0);
+      var showBars = totals.length >= 2 && maxTotal > 0;
+      el.compareBars.hidden = !showBars;
+      el.compareBars.replaceChildren();
+      if (showBars) {
+        totals.forEach(function (item) {
+          var row = make('div', 'compare-bar-row');
+          row.appendChild(make('span', null, monthLabel(item.period)));
+          var track = make('div', 'compare-bar-track');
+          var fill = make('span', 'compare-bar-fill');
+          fill.style.width = Math.max(2, Math.round(item.views * 100 / maxTotal)) + '%';
+          track.appendChild(fill);
+          row.appendChild(track);
+          row.appendChild(make('span', 'compare-bar-value', formatNumber(item.views) + ' views'));
+          el.compareBars.appendChild(row);
+        });
+      }
+    }
+
+    el.compareSummary.hidden = false;
+    el.compareSummary.textContent =
+      formatNumber(data.summary.accounts) + ' akun · ' +
+      formatNumber(data.summary.new_accounts) + ' baru bulan ini · ' +
+      formatNumber(data.summary.missing_latest) + ' tidak mengirim tautan bulan ini';
+  }
+
+  // ---------- Manual search ----------
+  function loadSearch() {
+    if (!el.dataSearch) return;
+    var query = el.dataSearch.value.trim();
+    if (query.length < 2) {
+      searchState.requestId += 1;
+      searchState.data = null;
+      ['Accounts', 'Targets', 'Posts'].forEach(function (name) {
+        el['search' + name + 'Card'].hidden = true;
+      });
+      el.searchSummary.hidden = true;
+      el.searchEmpty.hidden = false;
+      el.searchEmptyTitle.textContent = 'Cari data yang sudah tersimpan';
+      el.searchEmptyCopy.textContent = 'Ketik minimal dua huruf. Pencarian mencakup target, akun, dan unggahan.';
+      return;
+    }
+    if (searchState.loading) return;
+    searchState.loading = true;
+    var requestId = ++searchState.requestId;
+    fetchJson('/api/search?q=' + encodeURIComponent(query)).then(function (data) {
+      if (requestId !== searchState.requestId) return;
+      searchState.data = data;
+      renderSearch();
+    }).catch(function () {
+      if (!unauthorizedShown) toast('error', 'Pencarian gagal dijalankan.');
+    }).finally(function () {
+      searchState.loading = false;
+    });
+  }
+
+  function renderSearch() {
+    var data = searchState.data || {};
+    var groups = [
+      ['Accounts', data.accounts || [], function (row) {
+        var tr = make('tr');
+        tr.appendChild(recapAccountCell({
+          platform: row.platform, username: row.username, handle: row.username
+        }));
+        tr.appendChild(make('td', null, platformLabel(row.platform)));
+        tr.appendChild(recapCell(formatNumber(row.follower_count), 'num'));
+        tr.appendChild(recapCell(formatNumber(row.post_count), 'num'));
+        tr.appendChild(recapCell(timeRelative(row.fetched_at)));
+        return tr;
+      }],
+      ['Targets', data.targets || [], function (row) {
+        var tr = make('tr');
+        var td = make('td', 'account-cell');
+        var line = make('span', 'account-line');
+        line.appendChild(platformDot(row.platform));
+        var handle = handleFromUrl(row.url) || row.username;
+        if (row.url) {
+          var link = make('a', 'account recap-link', handle ? '@' + handle : row.url);
+          link.href = row.url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          line.appendChild(link);
+        } else {
+          line.appendChild(make('span', 'account', handle || '—'));
+        }
+        td.appendChild(line);
+        tr.appendChild(td);
+        tr.appendChild(make('td', null, monthLabel(row.period)));
+        tr.appendChild(statusCell({ status: row.status || 'PENDING' }));
+        tr.appendChild(recapCell(timeRelative(row.last_scraped_at)));
+        return tr;
+      }],
+      ['Posts', data.posts || [], function (row) {
+        var tr = make('tr');
+        tr.appendChild(recapAccountCell({
+          platform: row.platform, username: row.username, handle: row.username
+        }));
+        tr.appendChild(recapCell(row.posted_at ? formatDateTime(row.posted_at) : '—'));
+        tr.appendChild(recapCell(formatNumber(row.views), 'num'));
+        tr.appendChild(recapCell(formatNumber(row.likes), 'num'));
+        tr.appendChild(make('td', 'caption-cell', row.caption || '—'));
+        return tr;
+      }]
+    ];
+
+    var total = 0;
+    var labels = { Accounts: 'Akun', Targets: 'Tautan', Posts: 'Unggahan' };
+    groups.forEach(function (group) {
+      var rows = group[1];
+      total += rows.length;
+      var card = el['search' + group[0] + 'Card'];
+      var body = el['search' + group[0] + 'Body'];
+      var title = card.querySelector('.recap-title');
+      if (title) {
+        title.replaceChildren(document.createTextNode(labels[group[0]] || group[0]));
+        title.appendChild(make('span', 'recap-count', formatNumber(rows.length) + ' hasil'));
+      }
+      body.replaceChildren();
+      rows.forEach(function (row) { body.appendChild(group[2](row)); });
+      card.hidden = rows.length === 0;
+    });
+
+    el.searchSummary.hidden = false;
+    el.searchSummary.textContent = total
+      ? formatNumber(total) + ' hasil untuk "' + (data.query || '') + '"'
+      : 'Tidak ada data yang cocok.';
+    el.searchEmpty.hidden = total > 0;
+    if (!total) {
+      el.searchEmptyTitle.textContent = 'Tidak ada hasil';
+      el.searchEmptyCopy.textContent = 'Coba handle lain, potongan URL, tema, atau kata di caption.';
+    }
   }
 
   // ---------- Shareable state ----------
@@ -642,12 +1685,23 @@
     if (!window.history || !window.history.replaceState) return;
     var params = [];
     if (currentAuditId) params.push('audit=' + currentAuditId);
-    if (activeTab !== 'targets') params.push('tab=' + activeTab);
+    if (activePage !== 'summary') params.push('page=' + activePage);
     if (targetState.query) params.push('q=' + encodeURIComponent(targetState.query));
     if (targetState.status) params.push('status=' + encodeURIComponent(targetState.status));
     if (targetState.platform) params.push('platform=' + encodeURIComponent(targetState.platform));
+    if (targetState.issue) params.push('issue=' + encodeURIComponent(targetState.issue));
     if (targetState.sort !== 'recent') params.push('sort=' + encodeURIComponent(targetState.sort) + '&dir=' + targetState.dir);
     if (targetState.offset > 0) params.push('offset=' + targetState.offset);
+    if (activePage === 'accounts') {
+      if (accountState.query) params.push('aq=' + encodeURIComponent(accountState.query));
+      if (accountState.level) params.push('al=' + encodeURIComponent(accountState.level));
+      if (accountState.band) params.push('ab=' + encodeURIComponent(accountState.band));
+      if (accountState.platform) params.push('ap=' + encodeURIComponent(accountState.platform));
+      if (accountState.sort !== 'risk') {
+        params.push('asort=' + encodeURIComponent(accountState.sort), 'adir=' + accountState.dir);
+      }
+      if (accountState.offset > 0) params.push('aoffset=' + accountState.offset);
+    }
     var url = location.pathname + (params.length ? '?' + params.join('&') : '');
     if (url !== location.pathname + location.search) {
       window.history.replaceState(null, '', url);
@@ -662,13 +1716,24 @@
       currentAuditId = Number(audit);
       autoSelectAudit = false;
     }
-    var tab = params.get('tab');
-    if (tab === 'activity' || tab === 'targets') initialTab = tab;
+    var page = params.get('page');
+    if (page === 'data') {
+      initialPage = 'targets';
+    } else if (page === 'compare') {
+      initialPage = 'summary';
+    } else if (PAGES.indexOf(page) !== -1) {
+      initialPage = page;
+    }
+    var view = params.get('view');
+    if (view === 'accounts' || view === 'targets' || view === 'search') dataView = view;
+    if (initialPage === 'accounts' || initialPage === 'search') dataView = initialPage;
     var status = params.get('status');
     targetState.query = (params.get('q') || '').slice(0, 120);
     targetState.status = ['done', 'pending', 'running', 'failed'].indexOf(status) !== -1 ? status : '';
     var platform = params.get('platform');
     targetState.platform = platform === 'instagram' || platform === 'tiktok' ? platform : '';
+    var issue = params.get('issue');
+    targetState.issue = ['no_followers', 'no_views'].indexOf(issue) !== -1 ? issue : '';
     var sort = params.get('sort');
     if (sort && ['username', 'followers', 'likes', 'comments', 'views', 'er'].indexOf(sort) !== -1) {
       targetState.sort = sort;
@@ -676,6 +1741,23 @@
     }
     var offset = Number(params.get('offset'));
     if (isFinite(offset) && offset > 0) targetState.offset = Math.floor(offset / targetState.limit) * targetState.limit;
+
+    var level = params.get('al');
+    accountState.level = ['curiga', 'pola_kembar', 'pola_ternak', 'amati', 'bersih'].indexOf(level) !== -1 ? level : '';
+    var band = params.get('ab');
+    accountState.band = ['ternak', 'kecil', 'besar'].indexOf(band) !== -1 ? band : '';
+    var accountPlatform = params.get('ap');
+    accountState.platform = accountPlatform === 'instagram' || accountPlatform === 'tiktok' ? accountPlatform : '';
+    accountState.query = (params.get('aq') || '').slice(0, 120);
+    var accountSort = params.get('asort');
+    if (accountSort && ['risk', 'followers', 'reach', 'posts', 'audits', 'age', 'username'].indexOf(accountSort) !== -1) {
+      accountState.sort = accountSort;
+      accountState.dir = params.get('adir') === 'asc' ? 'asc' : 'desc';
+    }
+    var accountOffset = Number(params.get('aoffset'));
+    if (isFinite(accountOffset) && accountOffset > 0) {
+      accountState.offset = Math.floor(accountOffset / accountState.limit) * accountState.limit;
+    }
   }
 
   // ---------- Target list ----------
@@ -684,6 +1766,7 @@
     if (currentAuditId) params.push('audit_id=' + encodeURIComponent(currentAuditId));
     if (targetState.status) params.push('status=' + encodeURIComponent(targetState.status));
     if (targetState.platform) params.push('platform=' + encodeURIComponent(targetState.platform));
+    if (targetState.issue) params.push('issue=' + encodeURIComponent(targetState.issue));
     if (targetState.query) params.push('q=' + encodeURIComponent(targetState.query));
     params.push('sort=' + encodeURIComponent(targetState.sort));
     params.push('dir=' + encodeURIComponent(targetState.dir));
@@ -693,7 +1776,13 @@
   }
 
   async function loadTargets(reset) {
-    if (reset) targetState.offset = 0;
+    if (reset) {
+      targetState.offset = 0;
+      // A new filter or audit means the previous selection no longer refers to
+      // the rows on screen; keeping it would retry the wrong batch.
+      selectedTargets.clear();
+      updateBatchBar();
+    }
     targetState.requestId += 1;
     var requestId = targetState.requestId;
     targetState.lastFetch = Date.now();
@@ -722,7 +1811,7 @@
   }
 
   function maybeLoadTargets(force) {
-    if (activeTab !== 'targets' || document.hidden) return;
+    if (activePage !== 'targets' || document.hidden) return;
     if (!force && Date.now() - targetState.lastFetch < TARGETS_REFRESH_MS) return;
     loadTargets(false);
   }
@@ -738,7 +1827,7 @@
       items: items.map(function (item) {
         return [item.target_id, item.status, item.error_code, item.retry_count,
           item.likes, item.comments, item.views, item.shares, item.follower_count,
-          item.snapshot_at, item.task_scraped_at];
+          item.snapshot_at, item.task_scraped_at, item.post_date];
       })
     });
     if (signature === targetState.signature) {
@@ -782,6 +1871,7 @@
       : null;
     var focusTargetId = focusRow ? focusRow.dataset.targetId : null;
     el.targetBody.replaceChildren(rowsFragment);
+    syncSelectAll();
     if (focusTargetId) {
       var restore = el.targetBody.querySelector('tr[data-target-id="' + focusTargetId + '"]');
       if (restore) restore.focus();
@@ -808,29 +1898,70 @@
     tr.tabIndex = 0;
     tr.title = (item.url ? item.url + '\n' : '') + 'Klik atau tekan Enter untuk riwayat target';
 
+    var selectTd = make('td', 'col-select');
+    var check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = selectedTargets.has(Number(item.target_id));
+    check.setAttribute('aria-label', 'Pilih baris ' + (targetHandle(item) || item.target_id));
+    check.addEventListener('change', function () {
+      if (check.checked) selectedTargets.add(Number(item.target_id));
+      else selectedTargets.delete(Number(item.target_id));
+      updateBatchBar();
+      syncSelectAll();
+    });
+    selectTd.appendChild(check);
+    tr.appendChild(selectTd);
+
     var accountTd = make('td', 'account-cell');
     var line = make('span', 'account-line');
     line.appendChild(platformDot(item.platform));
-    line.appendChild(make('span', 'account', item.username ? '@' + item.username : (item.url || '—')));
+    var handle = targetHandle(item);
+    line.appendChild(make('span', 'account', handle ? '@' + handle : (item.url || '—')));
     accountTd.appendChild(line);
 
+    var urlHandle = handleFromUrl(item.url);
+    var labelConflict = urlHandle && item.username &&
+      urlHandle.toLowerCase() !== String(item.username).toLowerCase();
     var subParts = [];
     if (item.tema) subParts.push(item.tema);
     if (!currentAuditId && item.audit_name) subParts.push(item.audit_name);
     var fresh = item.snapshot_at || item.task_scraped_at || null;
-    subParts.push(fresh ? timeRelative(fresh) : 'Belum dicek');
+    subParts.push(fresh ? 'diperiksa ' + timeRelative(fresh) : 'belum dicek');
+    if (labelConflict) subParts.push('berkas: @' + item.username);
     var sub = make('span', 'account-sub', subParts.join(' · '));
     if (fresh) sub.title = formatDateTime(fresh);
+    if (labelConflict) {
+      sub.classList.add('is-warn');
+      sub.title = 'Kolom akun di berkas (@' + item.username + ') berbeda dari pemilik tautan (@' +
+        urlHandle + '). Nama yang ditampilkan mengikuti tautan.' +
+        (fresh ? '\nDiperiksa ' + formatDateTime(fresh) : '');
+    }
     accountTd.appendChild(sub);
     tr.appendChild(accountTd);
 
-    tr.appendChild(metricValueCell(item.follower_count));
-    tr.appendChild(metricValueCell(item.likes));
-    tr.appendChild(metricValueCell(item.comments));
+    var postTd = make('td', 'data-cell col-upload');
+    postTd.appendChild(make('span', 'metric-value',
+      item.post_date ? formatDateTime(item.post_date) : '—'));
+    if (item.url) {
+      var postLink = make('a', 'recap-link', 'buka');
+      postLink.href = item.url;
+      postLink.target = '_blank';
+      postLink.rel = 'noopener noreferrer';
+      postTd.appendChild(postLink);
+    }
+    tr.appendChild(postTd);
+
+    tr.appendChild(metricValueCell(item.follower_count, missingReason(item, 'followers'), 'col-followers'));
+    tr.appendChild(metricValueCell(item.likes, null, 'col-likes'));
+    tr.appendChild(metricValueCell(item.comments, null, 'col-comments'));
     tr.appendChild(metricValueCell(item.views));
 
-    var erTd = make('td', 'num er');
-    erTd.appendChild(make('span', 'metric-value', formatEr(item.engagement_rate)));
+    var erTd = make('td', 'num er col-er');
+    var targetErNode = make('span', 'metric-value', formatEr(item.engagement_rate));
+    if (item.engagement_rate === null || item.engagement_rate === undefined) {
+      targetErNode.title = erMissingReason(item);
+    }
+    erTd.appendChild(targetErNode);
     tr.appendChild(erTd);
 
     tr.appendChild(statusCell(item));
@@ -838,10 +1969,30 @@
     return tr;
   }
 
-  function metricValueCell(value) {
-    var td = make('td', 'num');
+  function metricValueCell(value, reason, extraClass) {
+    var td = make('td', 'num' + (extraClass ? ' ' + extraClass : ''));
+    var missing = value === null || value === undefined || value === '';
     td.appendChild(make('span', 'metric-value', formatNumber(value)));
+    // A dash without a reason is unreadable: "no followers" and "failed to read"
+    // look identical, and one of them means the audit itself is incomplete. Only
+    // the followers column prints the reason: repeating it on four cells of the
+    // same failed row turns one explanation into noise.
+    // The reason stays on the cell, not in the row: repeating "profil belum
+    // diukur" under every dash turned a 40px row into a paragraph and made the
+    // table harder to scan. The quality card counts these gaps.
+    if (missing) {
+      td.title = reason
+        ? reason + ' — angka belum tersedia pada pengambilan terakhir.'
+        : 'Angka tidak tersedia — lihat kolom Status.';
+    }
     return td;
+  }
+
+  function missingReason(item, field) {
+    if (item.status === 'FAILED') return 'gagal dibaca';
+    if (item.status === 'PENDING' || item.status === 'RUNNING') return 'belum dicek';
+    if (field === 'followers') return 'profil belum diukur';
+    return 'tidak tersedia';
   }
 
   function sortTargets(key) {
@@ -869,22 +2020,586 @@
     });
   }
 
-  function setTab(name, focusTab) {
-    activeTab = name === 'activity' ? 'activity' : 'targets';
-    var showTargets = activeTab === 'targets';
+  // ---------- Account master list ----------
+  var ACCOUNT_LEVELS = {
+    pola_kembar: { cls: 'badge-risk-high', label: 'Pola kembar' },
+    pola_ternak: { cls: 'badge-risk-mid', label: 'Pola ternak' },
+    amati: { cls: 'badge-risk-watch', label: 'Diamati' },
+    bersih: { cls: 'badge-risk-clean', label: 'Bersih' }
+  };
 
-    el.tabTargets.setAttribute('aria-selected', showTargets ? 'true' : 'false');
-    el.tabActivity.setAttribute('aria-selected', showTargets ? 'false' : 'true');
-    el.tabTargets.tabIndex = showTargets ? 0 : -1;
-    el.tabActivity.tabIndex = showTargets ? -1 : 0;
-    el.targetPanel.hidden = !showTargets;
-    el.activityPanel.hidden = showTargets;
+  var LINK_REASON_LABELS = {
+    konten: 'unggahannya sama',
+    kontak: 'kontak bionya sama',
+    template: 'captionnya seragam',
+    serentak: 'jam uploadnya berdekatan'
+  };
+
+  function levelMeta(level) {
+    return ACCOUNT_LEVELS[level] || ACCOUNT_LEVELS.bersih;
+  }
+
+  function handleFromKey(key) {
+    var index = String(key || '').indexOf(':');
+    return index === -1 ? String(key || '') : '@' + String(key).slice(index + 1);
+  }
+
+  function reasonLabel(kind) {
+    return LINK_REASON_LABELS[kind] || kind;
+  }
+
+  function pickReach(item) {
+    var metrics = (item && item.metrics) || {};
+    var value = metrics.view_reach_pct;
+    if (value === null || value === undefined) value = metrics.like_reach_pct;
+    return value === null || value === undefined || !isFinite(Number(value)) ? null : Number(value);
+  }
+
+  function formatPct(value) {
+    if (value === null || value === undefined || !isFinite(Number(value))) return '—';
+    return Number(value).toFixed(1).replace('.', ',') + '%';
+  }
+
+  function formatDecimal(value) {
+    if (value === null || value === undefined || !isFinite(Number(value))) return '—';
+    return Number(value).toFixed(1).replace('.', ',');
+  }
+
+  function riskBadge(item) {
+    var meta = levelMeta(item.level);
+    var badge = make('span', 'badge ' + meta.cls, meta.label);
+    var reasons = (item.flags || []).map(function (flag) { return flag.label; });
+    badge.title = reasons.length
+      ? reasons.join(' · ') + ' — skor ' + item.score
+      : 'Tidak ada sinyal mencurigakan';
+    return badge;
+  }
+
+  function accountQueryString() {
+    var params = [];
+    if (accountState.level) params.push('level=' + encodeURIComponent(accountState.level));
+    if (accountState.band) params.push('band=' + encodeURIComponent(accountState.band));
+    if (accountState.platform) params.push('platform=' + encodeURIComponent(accountState.platform));
+    if (accountState.query) params.push('q=' + encodeURIComponent(accountState.query));
+    params.push('sort=' + encodeURIComponent(accountState.sort));
+    params.push('dir=' + encodeURIComponent(accountState.dir));
+    params.push('limit=' + accountState.limit);
+    params.push('offset=' + accountState.offset);
+    return '/api/accounts?' + params.join('&');
+  }
+
+  async function loadAccounts(reset) {
+    if (reset) accountState.offset = 0;
+    accountState.requestId += 1;
+    var requestId = accountState.requestId;
+    accountState.lastFetch = Date.now();
+    syncUrl();
+    try {
+      var data = await fetchJson(accountQueryString());
+      if (requestId !== accountState.requestId) return;
+      accountState.items = Array.isArray(data.items) ? data.items : [];
+      accountState.total = Number(data.total) || 0;
+      accountState.limit = Number(data.limit) || accountState.limit;
+      accountState.offset = Number(data.offset) || 0;
+      accountState.clusters = Array.isArray(data.clusters) ? data.clusters : [];
+      accountState.summary = data.summary || null;
+      accountState.thresholds = data.thresholds || null;
+      if (el.accountSkeleton) el.accountSkeleton.hidden = true;
+      renderAccounts();
+    } catch (error) {
+      if (el.accountSkeleton) el.accountSkeleton.hidden = true;
+      if (unauthorizedShown || requestId !== accountState.requestId) return;
+      el.accountTableWrap.hidden = true;
+      el.accountPager.hidden = true;
+      el.accountSummary.hidden = true;
+      el.accountClusters.hidden = true;
+      el.accountEmpty.hidden = false;
+      el.accountEmptyTitle.textContent = 'Gagal memuat akun';
+      el.accountEmptyCopy.textContent = 'Backend tidak dapat dihubungi. Data yang terakhir tampil tetap tersimpan.';
+      el.accountResetBtn.hidden = true;
+      el.accountRetryBtn.hidden = false;
+    }
+  }
+
+  function maybeLoadAccounts(force) {
+    if (activePage !== 'accounts' || document.hidden) return;
+    if (!force && Date.now() - accountState.lastFetch < ACCOUNTS_REFRESH_MS) return;
+    loadAccounts(false);
+  }
+
+  function renderAccountSummary() {
+    var summary = accountState.summary;
+    if (!summary || !summary.accounts) {
+      el.accountSummary.hidden = true;
+      return;
+    }
+    var thresholds = accountState.thresholds || {};
+    var band = Array.isArray(thresholds.band) ? thresholds.band : [];
+    var parts = [
+      formatNumber(summary.accounts) + ' akun tersimpan',
+      formatNumber(summary.flagged) + ' berpola mencurigakan',
+      formatNumber(summary.in_band) + ' dalam band ' + formatNumber(band[0]) + '–' + formatNumber(band[1])
+    ];
+    if (summary.shown !== summary.accounts) parts.unshift(formatNumber(summary.shown) + ' cocok filter');
+    parts.push(formatNumber(summary.needs_refresh) + ' perlu diharvest ulang');
+    el.accountSummary.textContent = parts.join(' · ');
+    el.accountSummary.hidden = false;
+  }
+
+  function renderAccountClusters() {
+    var clusters = accountState.clusters || [];
+    el.accountClusters.replaceChildren();
+    if (!clusters.length) {
+      el.accountClusters.hidden = true;
+      return;
+    }
+    el.accountClusters.appendChild(document.createTextNode(
+      clusters.length + ' grup akun tertaut: '));
+    clusters.slice(0, 4).forEach(function (cluster, index) {
+      if (index) el.accountClusters.appendChild(document.createTextNode(' · '));
+      var entry = make('span', 'cluster-item', cluster.members.map(handleFromKey).join(' + '));
+      if (cluster.strong) entry.classList.add('is-strong');
+      entry.title = (cluster.reasons || []).map(reasonLabel).join(', ');
+      el.accountClusters.appendChild(entry);
+    });
+    if (clusters.length > 4) {
+      el.accountClusters.appendChild(document.createTextNode(' +' + (clusters.length - 4) + ' grup lain'));
+    }
+    el.accountClusters.hidden = false;
+  }
+
+  function renderAccounts() {
+    if (el.accountSkeleton) el.accountSkeleton.hidden = true;
+    renderAccountSummary();
+    renderAccountClusters();
+
+    var items = accountState.items;
+    var signature = JSON.stringify({
+      total: accountState.total,
+      offset: accountState.offset,
+      sort: accountState.sort + accountState.dir,
+      items: items.map(function (item) {
+        return [item.key, item.followers, item.score, item.level, item.needs_refresh,
+          item.metrics.view_reach_pct, item.metrics.like_reach_pct, item.metrics.posts_per_week,
+          item.audits_seen, item.fetched_at];
+      })
+    });
+    if (signature === accountState.signature) {
+      updateAccountSortHeaders();
+      return;
+    }
+    accountState.signature = signature;
+
+    if (!items.length) {
+      el.accountTableWrap.hidden = true;
+      el.accountPager.hidden = true;
+      el.accountEmpty.hidden = false;
+      el.accountRetryBtn.hidden = true;
+      var filtered = Boolean(accountState.level || accountState.band || accountState.platform || accountState.query);
+      if (filtered) {
+        el.accountEmptyTitle.textContent = 'Tidak ada akun yang cocok';
+        el.accountEmptyCopy.textContent = 'Ubah filter atau level risiko untuk melihat akun lain.';
+        el.accountResetBtn.hidden = false;
+      } else {
+        el.accountEmptyTitle.textContent = 'Belum ada akun tersimpan';
+        el.accountEmptyCopy.textContent = 'Akun terisi sendiri saat worker membuka link atau profil akun dari ekstensi.';
+        el.accountResetBtn.hidden = true;
+      }
+      el.accountBody.replaceChildren();
+      updateAccountSortHeaders();
+      return;
+    }
+
+    var fragment = document.createDocumentFragment();
+    items.forEach(function (item) { fragment.appendChild(buildAccountRow(item)); });
+    var focusRow = el.accountBody.contains(document.activeElement)
+      ? document.activeElement.closest('tr[data-account-key]')
+      : null;
+    var focusKey = focusRow ? focusRow.dataset.accountKey : null;
+    el.accountBody.replaceChildren(fragment);
+    if (focusKey) {
+      var restore = el.accountBody.querySelector('tr[data-account-key="' + focusKey + '"]');
+      if (restore) restore.focus();
+    }
+
+    el.accountTableWrap.hidden = false;
+    el.accountEmpty.hidden = true;
+
+    var start = accountState.offset + 1;
+    var end = Math.min(accountState.offset + items.length, accountState.total);
+    var page = Math.floor(accountState.offset / accountState.limit) + 1;
+    var pages = Math.max(1, Math.ceil(accountState.total / accountState.limit));
+    el.accountPageInfo.textContent = 'Halaman ' + page + ' dari ' + pages + ' · ' +
+      formatNumber(start) + '–' + formatNumber(end) + ' dari ' + formatNumber(accountState.total) + ' akun';
+    el.accountPrev.disabled = accountState.offset <= 0;
+    el.accountNext.disabled = accountState.offset + items.length >= accountState.total;
+    el.accountPager.hidden = false;
+    updateAccountSortHeaders();
+  }
+
+  function buildAccountRow(item) {
+    var tr = make('tr');
+    tr.dataset.accountKey = item.key;
+    tr.tabIndex = 0;
+    tr.title = 'Klik atau tekan Enter untuk bukti, riwayat bulanan, dan unggahan akun ini';
+
+    var accountTd = make('td', 'account-cell');
+    var line = make('span', 'account-line');
+    line.appendChild(platformDot(item.platform));
+    line.appendChild(make('span', 'account', '@' + (item.username || '—')));
+    if (item.is_verified) {
+      var tick = make('span', 'verified-mark', '✓');
+      tick.title = 'Akun terverifikasi';
+      line.appendChild(tick);
+    }
+    accountTd.appendChild(line);
+
+    var subParts = [];
+    if (item.display_name) subParts.push(item.display_name);
+    if (item.in_ternak_band) subParts.push('band ternak');
+    if (item.following) subParts.push('following ' + formatNumber(item.following));
+    var sub = make('span', 'account-sub', subParts.join(' · '));
+    if (item.bio) sub.title = item.bio;
+    accountTd.appendChild(sub);
+    tr.appendChild(accountTd);
+
+    tr.appendChild(metricValueCell(item.followers, null, 'col-followers'));
+
+    var reachTd = make('td', 'num er');
+    var reach = pickReach(item);
+    reachTd.appendChild(make('span', 'metric-value', formatPct(reach)));
+    if (reach === null) {
+      reachTd.appendChild(make('span', 'metric-sub', 'belum cukup unggahan'));
+    } else if (reach < (item.platform === 'tiktok' ? 3 : 1)) {
+      reachTd.appendChild(make('span', 'metric-sub is-error', 'di bawah ambang'));
+    }
+    tr.appendChild(reachTd);
+
+    var uploadTd = make('td', 'num col-posts');
+    uploadTd.appendChild(make('span', 'metric-value', formatDecimal(item.metrics.posts_per_week)));
+    if (item.metrics.upload_burst >= 3) {
+      var burstSub = make('span', 'metric-sub is-error', item.metrics.upload_burst + ' sekaligus');
+      burstSub.title = 'Beberapa unggahan naik dalam jendela beberapa menit.';
+      uploadTd.appendChild(burstSub);
+    }
+    tr.appendChild(uploadTd);
+
+    var auditsTd = make('td', 'num col-audits');
+    auditsTd.appendChild(make('span', 'metric-value', formatNumber(item.audits_seen)));
+    var targetSub = make('span', 'metric-sub', item.targets_seen + ' link');
+    targetSub.title = 'Jumlah link akun ini yang sudah diverifikasi.';
+    auditsTd.appendChild(targetSub);
+    tr.appendChild(auditsTd);
+
+    var dataTd = make('td', 'data-cell col-updated');
+    dataTd.appendChild(make('span', 'metric-value', item.fetched_at ? timeRelative(item.fetched_at) : 'Belum ada'));
+    if (item.needs_refresh) {
+      var due = make('span', 'metric-sub is-warn', 'perlu diharvest');
+      due.title = 'Data lebih tua dari masa pakai cache; bulan depan akun ini cukup dibuka sekali.';
+      dataTd.appendChild(due);
+    }
+    tr.appendChild(dataTd);
+
+    var riskTd = make('td', 'num status-cell');
+    riskTd.appendChild(riskBadge(item));
+    var scoreSub = make('span', 'cell-sub', item.score + ' poin');
+    if (item.flags.length) scoreSub.title = item.flags.map(function (flag) { return flag.label; }).join(' · ');
+    riskTd.appendChild(scoreSub);
+    tr.appendChild(riskTd);
+
+    return tr;
+  }
+
+  function sortAccounts(key) {
+    if (accountState.sort === key) {
+      accountState.dir = accountState.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      accountState.sort = key;
+      accountState.dir = key === 'username' ? 'asc' : 'desc';
+    }
+    accountState.offset = 0;
+    updateAccountSortHeaders();
+    loadAccounts(false);
+  }
+
+  function updateAccountSortHeaders() {
+    if (!el.accountHead) return;
+    var headers = el.accountHead.querySelectorAll('th[aria-sort]');
+    Array.prototype.forEach.call(headers, function (th) {
+      var button = th.querySelector('button[data-account-sort]');
+      if (!button) return;
+      var active = button.dataset.accountSort === accountState.sort;
+      th.setAttribute('aria-sort', active ? (accountState.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+      var ind = button.querySelector('.sort-ind');
+      if (ind) ind.textContent = active ? (accountState.dir === 'asc' ? '↑' : '↓') : '↕';
+    });
+  }
+
+  function resetAccountFilters() {
+    el.accountSearch.value = '';
+    el.accountLevel.value = '';
+    el.accountBand.value = '';
+    el.accountPlatform.value = '';
+    accountState.query = '';
+    accountState.level = '';
+    accountState.band = '';
+    accountState.platform = '';
+    loadAccounts(true);
+  }
+
+  // ---------- Account detail ----------
+  async function openAccountDetail(key) {
+    var index = String(key || '').indexOf(':');
+    if (index === -1) return;
+    var platform = String(key).slice(0, index);
+    var username = String(key).slice(index + 1);
+
+    showModal(el.accountModal, el.accountClose);
+    accountDetailRequest += 1;
+    var requestId = accountDetailRequest;
+    el.accountTitle.textContent = '@' + username;
+    el.accountSub.textContent = 'Memuat…';
+    el.accountRisk.hidden = true;
+    el.accountFlags.replaceChildren();
+    el.accountProfile.replaceChildren();
+    el.accountSiblingsBox.hidden = true;
+    el.accountSiblings.replaceChildren();
+    el.accountTrendBox.hidden = true;
+    el.accountHistoryBody.replaceChildren();
+    el.accountPostsBox.hidden = true;
+    el.accountPostsBody.replaceChildren();
+
+    try {
+      var data = await fetchJson('/api/accounts/' + encodeURIComponent(platform) + '/' + encodeURIComponent(username));
+      if (requestId !== accountDetailRequest) return;
+      renderAccountDetail(data.account || {});
+    } catch (error) {
+      if (requestId !== accountDetailRequest || unauthorizedShown) return;
+      el.accountSub.textContent = error.message || 'Gagal memuat detail akun.';
+    }
+  }
+
+  function profileRow(label, value, hint) {
+    var row = make('div', 'profile-row');
+    row.appendChild(make('span', 'profile-label', label));
+    row.appendChild(make('span', 'profile-value', value === null || value === undefined || value === '' ? '—' : value));
+    if (hint) row.appendChild(make('span', 'profile-hint', hint));
+    return row;
+  }
+
+  function renderAccountDetail(account) {
+    if (!account || !account.username) {
+      el.accountSub.textContent = 'Akun belum pernah disimpan.';
+      return;
+    }
+
+    el.accountTitle.textContent = '@' + account.username;
+    var sub = el.accountSub;
+    sub.replaceChildren();
+    sub.appendChild(document.createTextNode(platformLabel(account.platform)));
+    if (account.display_name) sub.appendChild(document.createTextNode(' · ' + account.display_name));
+    if (account.region) sub.appendChild(document.createTextNode(' · ' + account.region));
+    if (account.fetched_at) {
+      var stamp = make('span', 'history-meta', ' · data ' + timeRelative(account.fetched_at));
+      stamp.title = formatDateTime(account.fetched_at);
+      sub.appendChild(stamp);
+    }
+
+    var meta = levelMeta(account.level);
+    el.accountRiskBadge.className = 'badge ' + meta.cls;
+    el.accountRiskBadge.textContent = meta.label;
+    el.accountRiskScore.textContent = account.score + ' poin';
+    el.accountFlags.replaceChildren();
+    (account.flags || []).forEach(function (flag) {
+      var row = make('li', 'flag-item');
+      row.appendChild(make('span', 'flag-label', flag.label));
+      row.appendChild(make('span', 'flag-detail', flag.detail));
+      row.appendChild(make('span', 'flag-points', '+' + flag.points));
+      el.accountFlags.appendChild(row);
+    });
+    if (!(account.flags || []).length) {
+      el.accountFlags.appendChild(make('li', 'flag-item', 'Tidak ada sinyal mencurigakan dari data yang kita punya.'));
+    }
+    el.accountRisk.hidden = false;
+
+    var metrics = account.metrics || {};
+    var profileRows = document.createDocumentFragment();
+    profileRows.appendChild(profileRow('Followers', formatNumber(account.followers),
+      account.in_ternak_band ? 'dalam band ternak' : null));
+    profileRows.appendChild(profileRow('Following', formatNumber(account.following)));
+    profileRows.appendChild(profileRow('Unggahan di profil', formatNumber(account.post_count)));
+    profileRows.appendChild(profileRow('Median views', formatNumber(metrics.median_views)));
+    profileRows.appendChild(profileRow('Median likes', formatNumber(metrics.median_likes)));
+    profileRows.appendChild(profileRow('Median komentar', formatNumber(metrics.median_comments)));
+    profileRows.appendChild(profileRow('Reach', formatPct(pickReach(account)),
+      account.platform === 'tiktok' ? 'views ÷ followers' : 'likes ÷ followers'));
+    profileRows.appendChild(profileRow('Bulan tercatat', formatNumber(account.months_seen),
+      account.follower_delta_pct === null || account.follower_delta_pct === undefined
+        ? null
+        : 'selisih ' + formatDecimal(account.follower_delta_pct) + '%'));
+    profileRows.appendChild(profileRow('Audit diikuti', formatNumber(account.audits_seen),
+      account.targets_seen + ' link diverifikasi'));
+    profileRows.appendChild(profileRow('Unggahan disimpan', formatNumber(metrics.posts_seen)));
+    if (account.bio) profileRows.appendChild(profileRow('Bio', account.bio));
+    if (account.external_id) profileRows.appendChild(profileRow('ID eksternal', account.external_id));
+    el.accountProfile.replaceChildren(profileRows);
+
+    var siblings = account.siblings || [];
+    if (siblings.length) {
+      var fragment = document.createDocumentFragment();
+      siblings.forEach(function (sibling) {
+        var row = make('li', 'peer-item');
+        row.appendChild(platformDot(sibling.platform));
+        row.appendChild(make('span', 'peer-handle', '@' + (sibling.username || '—')));
+        row.appendChild(make('span', 'peer-score', levelMeta(sibling.level).label + ' · ' + (sibling.score || 0)));
+        var reasons = (sibling.reasons || []).map(reasonLabel).join(', ');
+        if (reasons) row.appendChild(make('span', 'peer-reason', reasons));
+        fragment.appendChild(row);
+      });
+      el.accountSiblings.replaceChildren(fragment);
+      el.accountSiblingsBox.hidden = false;
+    }
+
+    var history = account.history || [];
+    if (history.length) {
+      var historyFragment = document.createDocumentFragment();
+      history.forEach(function (row, index) {
+        var previous = history[index - 1] || null;
+        var tr = make('tr');
+        tr.appendChild(make('td', 'row-time', row.month));
+        tr.appendChild(monthCell(row.follower_count, previous ? previous.follower_count : null));
+        tr.appendChild(make('td', 'num', formatNumber(row.following_count)));
+        tr.appendChild(make('td', 'num', formatNumber(row.post_count)));
+        var visitsTd = make('td', 'num');
+        visitsTd.appendChild(make('span', 'metric-value', formatNumber(row.visits)));
+        if (row.first_seen_at) visitsTd.title = 'Pertama ' + formatDateTime(row.first_seen_at);
+        tr.appendChild(visitsTd);
+        historyFragment.appendChild(tr);
+      });
+      el.accountHistoryBody.replaceChildren(historyFragment);
+      el.accountTrendBox.hidden = false;
+    }
+
+    var posts = account.posts || [];
+    if (posts.length) {
+      var postFragment = document.createDocumentFragment();
+      posts.forEach(function (post) {
+        var tr = make('tr');
+        var timeTd = make('td', 'row-time', post.posted_at ? timeRelative(post.posted_at) : '—');
+        if (post.posted_at) timeTd.title = formatDateTime(post.posted_at);
+        tr.appendChild(timeTd);
+        tr.appendChild(make('td', 'num', formatNumber(post.views)));
+        tr.appendChild(make('td', 'num', formatNumber(post.likes)));
+        tr.appendChild(make('td', 'num', formatNumber(post.comments)));
+        var captionTd = make('td', 'caption-cell', post.caption || '—');
+        if (post.caption) captionTd.title = post.caption;
+        tr.appendChild(captionTd);
+        postFragment.appendChild(tr);
+      });
+      el.accountPostsBody.replaceChildren(postFragment);
+      el.accountPostsBox.hidden = false;
+    }
+  }
+
+  function monthCell(value, previous) {
+    var td = make('td', 'num');
+    td.appendChild(make('span', 'metric-value', formatNumber(value)));
+    var delta = deltaNode(value, previous);
+    if (delta) td.appendChild(delta);
+    return td;
+  }
+
+  function closeAccountDetail() {
+    hideModal(el.accountModal);
+  }
+
+  // A shared toolbar belongs to the page it acts on: title first, then tabs and
+  // actions. Moving the one toolbar keeps a single set of ids instead of copying
+  // the markup into every data view.
+  function positionDataChrome(onData) {
+    el.dataToolbar.hidden = !onData;
+    if (!onData) return;
+    var section = document.querySelector('.page[data-page="' + activePage + '"]');
+    if (!section) return;
+    var head = section.querySelector('.page-head');
+    if (!head) return;
+    if (el.dataActions && el.dataActions.parentNode !== head) head.appendChild(el.dataActions);
+    if (head.nextElementSibling !== el.dataToolbar) {
+      head.insertAdjacentElement('afterend', el.dataToolbar);
+    }
+  }
+
+  function setPage(name, focusMenu) {
+    activePage = PAGES.indexOf(name) === -1 ? 'summary' : name;
+
+    var pages = [
+      { key: 'summary', node: el.pageSummary },
+      { key: 'activity', node: el.pageActivity },
+      { key: 'targets', node: el.pageTargets },
+      { key: 'accounts', node: el.pageAccounts },
+      { key: 'search', node: el.pageSearch },
+      { key: 'settings', node: el.pageSettings }
+    ];
+    pages.forEach(function (page) {
+      page.node.hidden = page.key !== activePage;
+    });
+
+    var menuKey = PAGE_MENU[activePage];
+    [el.navSummary, el.navActivity, el.navData, el.navSettings].forEach(function (button) {
+      var selected = button.dataset.page === menuKey;
+      button.classList.toggle('is-active', selected);
+      if (selected) button.setAttribute('aria-current', 'page');
+      else button.removeAttribute('aria-current');
+      if (selected && focusMenu) button.focus();
+    });
+
+    // Import, export and the target filters belong to the data pages only.
+    var onData = activePage === 'targets' || activePage === 'accounts' || activePage === 'search';
+    el.targetToolbar.hidden = activePage !== 'targets';
+    positionDataChrome(onData);
+    // The audit picker is not part of Settings; there it reads as if it changed
+    // which settings are edited rather than which batch is in scope.
+    if (el.sidebarAudit) el.sidebarAudit.hidden = activePage === 'settings';
+    updateRetryButton();
+    updateBatchBar();
     syncUrl();
 
-    if (focusTab === 'targets') el.tabTargets.focus();
-    if (focusTab === 'activity') el.tabActivity.focus();
+    if (activePage === 'settings') fillSettingsForm();
+    if (activePage === 'summary') {
+      loadSummary(false);
+      // Comparison is part of the overview, not a separate workspace.
+      loadCompare(false);
+      loadRisk(false);
+    }
+    if (activePage === 'search') loadSearch(false);
+    if (activePage === 'targets') loadTargets(false);
+    if (activePage === 'accounts') loadAccounts(false);
+  }
 
-    if (showTargets) loadTargets(false);
+  function fillSettingsForm() {
+    var audit = selectedAudit();
+    if (!audit) return;
+    // Never overwrite a field the user is currently typing in.
+    if (document.activeElement !== el.settingsName) el.settingsName.value = audit.name || '';
+    if (document.activeElement !== el.settingsRepeat) {
+      el.settingsRepeat.value = String(audit.repeat_days || 0);
+    }
+    if (document.activeElement !== el.settingsPeriod) {
+      el.settingsPeriod.value = audit.period || '';
+    }
+  }
+
+  function setDataView(view, focusTab) {
+    dataView = view === 'accounts' || view === 'search' ? view : 'targets';
+    [['targets', el.tabTargets], ['accounts', el.tabAccounts], ['search', el.tabSearch]]
+      .forEach(function (pair) {
+        if (!pair[1]) return;
+        var selected = pair[0] === dataView;
+        pair[1].setAttribute('aria-selected', selected ? 'true' : 'false');
+        pair[1].tabIndex = selected ? 0 : -1;
+        if (selected && focusTab) pair[1].focus();
+      });
+    setPage(dataView);
   }
 
   // ---------- Activity sorting ----------
@@ -900,6 +2615,10 @@
     if (key === 'time') {
       var date = parseServerTime(item.scraped_at);
       return date ? date.getTime() : 0;
+    }
+    if (key === 'upload') {
+      var upload = parseServerTime(item.post_date);
+      return upload ? upload.getTime() : null;
     }
     var num = Number(item[key]);
     return item[key] === null || item[key] === undefined || !isFinite(num) ? null : num;
@@ -954,7 +2673,8 @@
     if (el.activitySkeleton) el.activitySkeleton.hidden = true;
     if (el.activityNote) {
       el.activityNote.hidden = lastRows.length === 0;
-      el.activityNote.textContent = 'Menampilkan ' + lastRows.length + ' snapshot terbaru. Klik baris untuk riwayat lengkap target.';
+      el.activityNote.textContent = formatNumber(lastRows.length) + ' unggahan terbaru · satu baris satu tautan';
+      el.activityNote.title = 'Tgl. unggah = waktu unggahan naik. Diperiksa = waktu data diambil. Klik baris untuk riwayat target.';
     }
 
     if (lastRows.length === 0) {
@@ -976,15 +2696,16 @@
       rows: lastRows.map(function (item) {
         return [item.id, item.status, item.error_code, item.likes, item.comments, item.views,
           item.shares, item.follower_count, item.prev_likes, item.prev_follower_count,
-          item.username, item.tema, item.audit_name, item.scraped_at];
+          item.username, item.tema, item.audit_name, item.scraped_at, item.post_date];
       })
     });
 
     if (!force && signature === rowsSignature) return;
     rowsSignature = signature;
 
+    var ordered = sortedRows();
     var fragment = document.createDocumentFragment();
-    sortedRows().forEach(function (item) { fragment.appendChild(buildRow(item)); });
+    ordered.forEach(function (item) { fragment.appendChild(buildRow(item)); });
     el.liveFeedBody.replaceChildren(fragment);
     el.tableWrap.hidden = false;
     el.emptyState.hidden = true;
@@ -999,7 +2720,8 @@
     var accountTd = make('td', 'account-cell');
     var line = make('span', 'account-line');
     line.appendChild(platformDot(item.platform));
-    line.appendChild(make('span', 'account', '@' + (item.username || '—')));
+    var rowHandle = targetHandle(item);
+    line.appendChild(make('span', 'account', rowHandle ? '@' + rowHandle : '—'));
     accountTd.appendChild(line);
     var subParts = [];
     if (item.tema) subParts.push(item.tema);
@@ -1007,22 +2729,29 @@
     if (subParts.length) accountTd.appendChild(make('span', 'account-sub', subParts.join(' · ')));
     tr.appendChild(accountTd);
 
-    tr.appendChild(metricCell(item.follower_count, item.prev_follower_count));
-    tr.appendChild(metricCell(item.likes, item.prev_likes));
-    tr.appendChild(metricCell(item.comments, item.prev_comments));
-    tr.appendChild(metricCell(item.views, item.prev_views));
+    // One value per cell: the per-post change lives in the history modal, so the
+    // feed stays scannable instead of every number carrying a second line.
+    tr.appendChild(metricValueCell(item.follower_count, missingReason(item, 'followers'), 'col-followers'));
+    tr.appendChild(metricValueCell(item.likes, null, 'col-likes'));
+    tr.appendChild(metricValueCell(item.comments, null, 'col-comments'));
+    tr.appendChild(metricValueCell(item.views));
 
-    var erTd = make('td', 'num er');
+    var erTd = make('td', 'num er col-er');
     var er = calcEr(item.platform, item.likes, item.comments, item.views, item.shares, item.follower_count);
-    var prevEr = calcEr(item.platform, item.prev_likes, item.prev_comments, item.prev_views, item.prev_shares, item.prev_follower_count);
-    erTd.appendChild(make('span', 'metric-value', formatEr(er)));
-    var erDelta = deltaNode(er, prevEr, 'pp');
-    if (erDelta) erTd.appendChild(erDelta);
+    var erNode = make('span', 'metric-value', formatEr(er));
+    if (er === null) erNode.title = erMissingReason(item);
+    erTd.appendChild(erNode);
     tr.appendChild(erTd);
+
+    // The upload time is the post's own timestamp, not when we checked it; the
+    // two differ by weeks and conflating them hides whether a post is fresh.
+    var uploadTd = make('td', 'row-time col-upload', item.post_date ? timeRelative(item.post_date) : '—');
+    if (item.post_date) uploadTd.title = formatDateTime(item.post_date);
+    tr.appendChild(uploadTd);
 
     tr.appendChild(statusCell(item));
 
-    var timeTd = make('td', 'row-time', timeRelative(item.scraped_at));
+    var timeTd = make('td', 'row-time col-checked', timeRelative(item.scraped_at));
     timeTd.title = formatDateTime(item.scraped_at);
     tr.appendChild(timeTd);
 
@@ -1274,6 +3003,9 @@
 
   function openImportModal() {
     setUploadStatus('', '');
+    if (!el.auditPeriod.value) {
+      el.auditPeriod.value = new Date().toISOString().slice(0, 7);
+    }
     showModal(el.importModal, el.dropzone);
   }
 
@@ -1291,13 +3023,163 @@
     hideModal(el.exportModal);
   }
 
-  function openManageModal() {
-    updateAuditMeta();
-    showModal(el.manageModal, el.cancelManage);
+  // ---------- Database backup ----------
+  function setDbStatus(message, className) {
+    el.dbStatus.textContent = message || '';
+    el.dbStatus.className = 'upload-status' + (className ? ' ' + className : '');
   }
 
-  function closeManageModal() {
-    hideModal(el.manageModal);
+  function renderDatabaseInfo(info) {
+    if (!info) return;
+    var counts = info.counts || {};
+    el.databaseStats.hidden = false;
+    el.dbSize.textContent = formatBytes(info.size_bytes);
+    el.dbAudits.textContent = formatNumber(counts.audits);
+    el.dbTargets.textContent = formatNumber(counts.targets);
+    el.dbAccounts.textContent = formatNumber(counts.accounts);
+    el.dbPosts.textContent = formatNumber(counts.account_posts);
+    el.dbSnapshots.textContent = formatNumber(counts.snapshots);
+    el.dbUpdated.textContent = info.updated_at
+      ? 'Diperbarui ' + timeRelative(info.updated_at) + ' · skema ' + (info.schema_version || '—')
+      : 'Database belum pernah diperbarui.';
+  }
+
+  function loadDatabaseInfo() {
+    fetchJson('/api/database/info').then(renderDatabaseInfo).catch(function (error) {
+      if (unauthorizedShown) return;
+      el.databaseStats.hidden = true;
+      el.dbUpdated.textContent = 'Info database tidak tersedia.';
+      setDbStatus(error.message || 'Gagal memuat info database.', 'is-error');
+    });
+  }
+
+  function openDatabaseModal() {
+    clearDbFile();
+    setDbStatus('', '');
+    el.databaseStats.hidden = true;
+    el.dbUpdated.textContent = 'Memuat ukuran database…';
+    showModal(el.databaseModal, el.dbDownloadBtn);
+    loadDatabaseInfo();
+  }
+
+  function closeDatabaseModal() {
+    if (restoreInFlight) return;
+    hideModal(el.databaseModal);
+  }
+
+  function clearDbFile() {
+    el.dbFileInput.value = '';
+    el.dbFileChip.hidden = true;
+    el.dbFileName.textContent = '—';
+    el.dbFileSize.textContent = '—';
+    el.dbRestoreBtn.disabled = true;
+  }
+
+  function setDbFile(file) {
+    if (!file) {
+      clearDbFile();
+      return;
+    }
+    if (!/\.(db|sqlite|sqlite3|backup)$/i.test(file.name)) {
+      clearDbFile();
+      setDbStatus('Format cadangan harus .db atau .sqlite.', 'is-error');
+      return;
+    }
+    el.dbFileName.textContent = file.name;
+    el.dbFileSize.textContent = formatBytes(file.size);
+    el.dbFileChip.hidden = false;
+    el.dbRestoreBtn.disabled = false;
+    setDbStatus('', '');
+  }
+
+  function databaseFilename() {
+    var now = new Date();
+    function pad(value) {
+      return String(value).length < 2 ? '0' + value : String(value);
+    }
+    return 'sunscraping_db_' + now.getFullYear() + pad(now.getMonth() + 1) +
+      pad(now.getDate()) + '_' + pad(now.getHours()) + pad(now.getMinutes()) + '.db';
+  }
+
+  async function downloadDatabase() {
+    el.dbDownloadBtn.disabled = true;
+    el.dbDownloadBtn.classList.add('is-loading');
+    try {
+      var response = await fetch('/api/database/export', { credentials: 'same-origin' });
+      if (response.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+      if (!response.ok) {
+        var payload = await response.json().catch(function () { return {}; });
+        toast('error', payload.error || 'Gagal membuat cadangan database.');
+        return;
+      }
+      var blob = await response.blob();
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement('a');
+      link.href = url;
+      link.download = databaseFilename();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      toast('success', 'Cadangan database diunduh.');
+    } catch (error) {
+      toast('error', 'Gagal mengunduh cadangan database.');
+    } finally {
+      el.dbDownloadBtn.disabled = false;
+      el.dbDownloadBtn.classList.remove('is-loading');
+    }
+  }
+
+  async function restoreDatabase() {
+    var file = el.dbFileInput.files && el.dbFileInput.files[0];
+    if (!file || restoreInFlight) return;
+
+    var confirmed = await askConfirm({
+      title: 'Pulihkan dari "' + file.name + '"?',
+      body: 'Seluruh audit, target, akun, dan unggahan yang ada sekarang diganti isi file ini. ' +
+        'Cadangan pengaman dibuat otomatis sebelum data diganti.',
+      confirmLabel: 'Pulihkan'
+    });
+    if (!confirmed) return;
+
+    restoreInFlight = true;
+    el.dbRestoreBtn.disabled = true;
+    el.dbRestoreBtn.classList.add('is-loading');
+    el.closeDatabase.disabled = true;
+    setDbStatus('Memulihkan database…', '');
+    try {
+      var form = new FormData();
+      form.append('file', file, file.name);
+      var response = await fetch('/api/database/import', {
+        method: 'POST',
+        credentials: 'same-origin',
+        body: form
+      });
+      if (response.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+      var data = await response.json().catch(function () { return {}; });
+      if (!response.ok) {
+        setDbStatus(data.error || 'Pemulihan database gagal.', 'is-error');
+        toast('error', data.error || 'Pemulihan database gagal.');
+        return;
+      }
+      setDbStatus('Database dipulihkan. Memuat ulang dashboard…', 'is-success');
+      toast('success', 'Database dipulihkan dari ' + file.name + '.');
+      setTimeout(function () { window.location.reload(); }, 1200);
+    } catch (error) {
+      setDbStatus('Tidak dapat menghubungi backend. Periksa Control Panel.', 'is-error');
+      toast('error', 'Pemulihan database gagal.');
+    } finally {
+      restoreInFlight = false;
+      el.dbRestoreBtn.classList.remove('is-loading');
+      el.closeDatabase.disabled = false;
+      if (el.dbFileInput.files && el.dbFileInput.files[0]) el.dbRestoreBtn.disabled = false;
+    }
   }
 
   document.addEventListener('keydown', function (event) {
@@ -1339,29 +3221,24 @@
     if (resolve) resolve(value);
   }
 
-  function openSettings() {
-    var audit = selectedAudit();
-    if (!audit) return;
-    el.settingsName.value = audit.name || '';
-    el.settingsRepeat.value = String(audit.repeat_days || 0);
-    el.settingsSub.textContent = 'Ubah nama dan jadwal pengecekan untuk "' + audit.name + '".';
-    showModal(el.settingsModal, el.settingsName);
-    el.settingsName.select();
-  }
-
-  function closeSettings() {
-    hideModal(el.settingsModal);
-  }
-
   // ---------- Polling + SSE ----------
   function applyPayload(data) {
     if (!data) return;
     lastSyncAt = Date.now();
     renderLastSync();
-    if (data.stats) renderStats(data.stats);
+    if (data.stats) {
+      renderStats(data.stats);
+      trackThroughput(data.stats);
+    }
     if (Array.isArray(data.latest)) renderRows(data.latest);
     if (Array.isArray(data.audits)) renderAudits(data.audits);
     maybeLoadTargets(false);
+    if (activePage === 'summary') {
+      loadSummary(false);
+      // Comparison is part of the overview, not a separate workspace.
+      loadCompare(false);
+      loadRisk(false);
+    }
   }
 
   function pollOnce() {
@@ -1678,9 +3555,9 @@
   }
 
   function downloadTemplate() {
-    var content = '\uFEFFLink,Username,Tema\r\n' +
-      'https://www.instagram.com/p/CONTOH123/,contoh_akun,Kampanye A\r\n' +
-      'https://www.tiktok.com/@contoh_akun/video/0000000000000000000,contoh_akun,Kampanye A\r\n';
+    // Header only: a template ships the shape of the file, never fake rows that
+    // could be mistaken for real data or imported by accident.
+    var content = '\uFEFFLink,Username,Tema\r\n';
     var blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var link = document.createElement('a');
@@ -1788,16 +3665,23 @@
     selectAudit(el.auditSelect.value);
   });
 
-  el.tabTargets.addEventListener('click', function () { setTab('targets'); });
-  el.tabActivity.addEventListener('click', function () { setTab('activity'); });
+  el.navSummary.addEventListener('click', function () { setPage('summary'); });
+  el.navActivity.addEventListener('click', function () { setPage('activity'); });
+  el.navData.addEventListener('click', function () { setDataView(dataView); });
+  el.navSettings.addEventListener('click', function () { setPage('settings'); });
 
-  [el.tabTargets, el.tabActivity].forEach(function (tab) {
-    tab.addEventListener('keydown', function (event) {
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-      event.preventDefault();
-      setTab(activeTab === 'targets' ? 'activity' : 'targets', true);
+  [['targets', el.tabTargets], ['accounts', el.tabAccounts], ['search', el.tabSearch]]
+    .forEach(function (pair, index, list) {
+      var tab = pair[1];
+      if (!tab) return;
+      tab.addEventListener('click', function () { setDataView(pair[0]); });
+      tab.addEventListener('keydown', function (event) {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        var step = event.key === 'ArrowRight' ? 1 : -1;
+        setDataView(list[(index + step + list.length) % list.length][0], true);
+      });
     });
-  });
 
   el.targetSearch.addEventListener('input', function () {
     var value = el.targetSearch.value.trim();
@@ -1819,6 +3703,11 @@
     loadTargets(true);
   });
 
+  el.targetIssue.addEventListener('change', function () {
+    targetState.issue = el.targetIssue.value;
+    loadTargets(true);
+  });
+
   el.targetPrev.addEventListener('click', function () {
     if (targetState.offset <= 0) return;
     targetState.offset = Math.max(0, targetState.offset - targetState.limit);
@@ -1835,9 +3724,11 @@
     el.targetSearch.value = '';
     el.targetStatus.value = '';
     el.targetPlatform.value = '';
+    el.targetIssue.value = '';
     targetState.query = '';
     targetState.status = '';
     targetState.platform = '';
+    targetState.issue = '';
     loadTargets(true);
   });
 
@@ -1845,6 +3736,104 @@
     el.targetRetryBtn.disabled = true;
     loadTargets(true);
     setTimeout(function () { el.targetRetryBtn.disabled = false; }, 800);
+  });
+
+  el.accountSearch.addEventListener('input', function () {
+    var value = el.accountSearch.value.trim();
+    clearTimeout(accountSearchTimer);
+    accountSearchTimer = setTimeout(function () {
+      accountState.query = value;
+      accountState.offset = 0;
+      loadAccounts(true);
+    }, 300);
+  });
+
+  el.accountLevel.addEventListener('change', function () {
+    accountState.level = el.accountLevel.value;
+    loadAccounts(true);
+  });
+
+  el.accountBand.addEventListener('change', function () {
+    accountState.band = el.accountBand.value;
+    loadAccounts(true);
+  });
+
+  el.accountPlatform.addEventListener('change', function () {
+    accountState.platform = el.accountPlatform.value;
+    loadAccounts(true);
+  });
+
+  el.accountPrev.addEventListener('click', function () {
+    if (accountState.offset <= 0) return;
+    accountState.offset = Math.max(0, accountState.offset - accountState.limit);
+    loadAccounts(false);
+  });
+
+  el.accountNext.addEventListener('click', function () {
+    if (accountState.offset + accountState.limit >= accountState.total) return;
+    accountState.offset += accountState.limit;
+    loadAccounts(false);
+  });
+
+  if (el.accountVisitBtn) {
+    el.accountVisitBtn.addEventListener('click', function () {
+      if (!currentAuditId) return;
+      el.accountVisitBtn.disabled = true;
+      postJson('/api/accounts/visit', { audit_id: currentAuditId, only_missing: true })
+        .then(function (data) {
+          toast('info', data.message || 'Kunjungan profil dijadwalkan.');
+          loadAccounts(true);
+        })
+        .catch(function () {
+          toast('error', 'Gagal menjadwalkan kunjungan profil.');
+        })
+        .finally(function () {
+          el.accountVisitBtn.disabled = false;
+        });
+    });
+  }
+
+  el.accountResetBtn.addEventListener('click', resetAccountFilters);
+
+  el.accountRetryBtn.addEventListener('click', function () {
+    el.accountRetryBtn.disabled = true;
+    loadAccounts(true);
+    setTimeout(function () { el.accountRetryBtn.disabled = false; }, 800);
+  });
+
+  el.accountHead.addEventListener('click', function (event) {
+    var button = event.target.closest('button[data-account-sort]');
+    if (button) sortAccounts(button.dataset.accountSort);
+  });
+
+  function handleAccountRow(node) {
+    var row = node.closest('tr[data-account-key]');
+    if (row) openAccountDetail(row.dataset.accountKey);
+  }
+
+  el.accountBody.addEventListener('click', function (event) {
+    handleAccountRow(event.target);
+  });
+
+  el.accountBody.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    var row = event.target.closest('tr[data-account-key]');
+    if (row) {
+      event.preventDefault();
+      openAccountDetail(row.dataset.accountKey);
+    }
+  });
+
+  el.reachInfoBtn.addEventListener('click', function () {
+    var open = el.reachInfo.hidden;
+    el.reachInfo.hidden = !open;
+    el.reachInfoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    el.reachInfoBtn.classList.toggle('is-active', open);
+  });
+
+  el.accountClose.addEventListener('click', closeAccountDetail);
+  el.accountModal.addEventListener('click', function (event) {
+    if (event.target === el.accountModal) closeAccountDetail();
   });
 
   el.emptyImportBtn.addEventListener('click', openImportModal);
@@ -1873,6 +3862,9 @@
   });
 
   function handleTargetRow(node) {
+    // The checkbox and inline links own their clicks; opening a modal instead
+    // would make selection impossible.
+    if (node.closest('input, button, a, label')) return;
     var row = node.closest('tr[data-target-id]');
     if (row) openHistory(Number(row.dataset.targetId));
   }
@@ -1883,6 +3875,7 @@
 
   el.targetBody.addEventListener('keydown', function (event) {
     if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.tagName === 'INPUT') return;
     var row = event.target.closest('tr[data-target-id]');
     if (row) {
       event.preventDefault();
@@ -1896,7 +3889,31 @@
 
   el.templateBtn.addEventListener('click', downloadTemplate);
 
-  el.exportStatus.addEventListener('change', updateExportHint);
+  el.exportStatus.addEventListener('change', updateExportHint);    el.compareMonths.addEventListener('change', function () {
+      compareState.expanded = false;
+      loadCompare(true);
+    });
+
+    if (el.compareMore) {
+      el.compareMore.addEventListener('click', function () {
+        compareState.expanded = !compareState.expanded;
+        renderCompare();
+      });
+    }
+
+    if (el.compareInfoBtn) {
+      el.compareInfoBtn.addEventListener('click', function () {
+        var open = el.compareInfo.hidden;
+        el.compareInfo.hidden = !open;
+        el.compareInfoBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        el.compareInfoBtn.classList.toggle('is-active', open);
+      });
+    }
+
+  el.dataSearch.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadSearch, 300);
+  });
 
   window.addEventListener('offline', function () {
     showOffline('Perangkat offline. Sambungkan jaringan untuk melanjutkan audit.');
@@ -1907,9 +3924,11 @@
     restartStream();
   });
 
-  el.retryFailedBtn.addEventListener('click', async function () {
+  async function retryFailed() {
     if (!currentAuditId) return;
-    el.retryFailedBtn.disabled = true;
+    [el.retryFailedBtn, el.processRetryBtn].forEach(function (button) {
+      if (button) button.disabled = true;
+    });
     try {
       var data = await postJson('/api/audits/' + currentAuditId + '/retry-failed');
       toast(data.created ? 'success' : 'info', data.message || 'Target gagal dijadwalkan ulang.');
@@ -1920,13 +3939,18 @@
     } finally {
       updateRetryButton();
     }
+  }
+
+  [el.retryFailedBtn, el.processRetryBtn].forEach(function (button) {
+    if (!button) return;
+    button.addEventListener('click', function () { retryFailed(); });
   });
 
-  el.rerunBtn.addEventListener('click', async function () {
+  async function runRerun(full, button) {
     if (!currentAuditId) return;
-    el.rerunBtn.disabled = true;
+    button.disabled = true;
     try {
-      var data = await postJson('/api/audits/' + currentAuditId + '/rerun');
+      var data = await postJson('/api/audits/' + currentAuditId + '/rerun', full ? { full: true } : {});
       toast(data.pending || data.empty ? 'info' : 'success', data.message || 'Audit dijadwalkan ulang.');
       pollOnce();
     } catch (error) {
@@ -1934,7 +3958,10 @@
     } finally {
       updateAuditMeta();
     }
-  });
+  }
+
+  el.rerunBtn.addEventListener('click', function () { runRerun(false, el.rerunBtn); });
+  el.rerunFullBtn.addEventListener('click', function () { runRerun(true, el.rerunFullBtn); });
 
   el.openImportBtn.addEventListener('click', openImportModal);
   el.closeImport.addEventListener('click', closeImportModal);
@@ -1950,18 +3977,23 @@
     if (event.target === el.exportModal) closeExportModal();
   });
 
-  el.openManageBtn.addEventListener('click', openManageModal);
-  el.closeManage.addEventListener('click', closeManageModal);
-  el.cancelManage.addEventListener('click', closeManageModal);
-  el.manageModal.addEventListener('click', function (event) {
-    if (event.target === el.manageModal) closeManageModal();
+  el.openDatabaseBtn.addEventListener('click', openDatabaseModal);
+  el.closeDatabase.addEventListener('click', closeDatabaseModal);
+  el.databaseModal.addEventListener('click', function (event) {
+    if (event.target === el.databaseModal) closeDatabaseModal();
   });
-
-  el.settingsBtn.addEventListener('click', openSettings);
-  el.cancelSettings.addEventListener('click', closeSettings);
-  el.settingsModal.addEventListener('click', function (event) {
-    if (event.target === el.settingsModal) closeSettings();
+  el.dbDownloadBtn.addEventListener('click', downloadDatabase);
+  el.dbDropzone.addEventListener('click', function () { el.dbFileInput.click(); });
+  el.dbDropzone.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    el.dbFileInput.click();
   });
+  el.dbFileInput.addEventListener('change', function () {
+    setDbFile(this.files && this.files[0]);
+  });
+  el.dbRemoveFile.addEventListener('click', clearDbFile);
+  el.dbRestoreBtn.addEventListener('click', restoreDatabase);
 
   el.settingsForm.addEventListener('submit', async function (event) {
     event.preventDefault();
@@ -1981,9 +4013,9 @@
     try {
       await postJson('/api/audits/' + currentAuditId + '/settings', {
         name: name,
-        repeat_days: Math.round(repeat)
+        repeat_days: Math.round(repeat),
+        period: el.settingsPeriod.value || null
       });
-      closeSettings();
       toast('success', 'Pengaturan audit disimpan.');
       pollOnce();
     } catch (error) {
@@ -2010,9 +4042,9 @@
       autoSelectAudit = true;
       localStorage.removeItem(STORAGE_KEY);
       toast('success', 'Audit dihapus.');
-      closeManageModal();
       restartStream();
       loadTargets(true);
+      maybeLoadAccounts(true);
     } catch (error) {
       if (!unauthorizedShown) toast('error', error.message || 'Gagal menghapus audit.');
     }
@@ -2032,9 +4064,10 @@
       autoSelectAudit = true;
       localStorage.removeItem(STORAGE_KEY);
       toast('success', 'Database dikosongkan.');
-      closeManageModal();
       restartStream();
       loadTargets(true);
+      accountState.signature = '';
+      maybeLoadAccounts(true);
     } catch (error) {
       if (!unauthorizedShown) toast('error', error.message || 'Gagal mengosongkan database.');
     }
@@ -2072,9 +4105,9 @@
     if (modal === el.confirmModal) settleConfirm(false);
     else if (modal === el.importModal) closeImportModal();
     else if (modal === el.exportModal) closeExportModal();
-    else if (modal === el.manageModal) closeManageModal();
+    else if (modal === el.databaseModal) closeDatabaseModal();
     else if (modal === el.historyModal) closeHistory();
-    else if (modal === el.settingsModal) closeSettings();
+    else if (modal === el.accountModal) closeAccountDetail();
   });
 
   document.addEventListener('visibilitychange', function () {
@@ -2082,6 +4115,7 @@
     pollOnce();
     if (!stream) connectStream();
     loadTargets(false);
+    maybeLoadAccounts(true);
   });
 
   setInterval(function () {
@@ -2097,6 +4131,7 @@
     renderWorker(lastStats && lastStats.WORKER_LAST_SEEN);
     renderLastSync();
     maybeLoadTargets(false);
+    maybeLoadAccounts(false);
   }, REFRESH_LABEL_MS);
 
   // ---------- File + upload wiring ----------
@@ -2174,6 +4209,7 @@
       if (append) formData.append('audit_id', String(currentAuditId));
       if (el.auditName.value.trim()) formData.append('audit_name', el.auditName.value.trim());
       formData.append('repeat_days', String(Math.round(repeat)));
+      if (el.auditPeriod.value) formData.append('period', el.auditPeriod.value);
 
       var response = await fetch('/api/upload', {
         method: 'POST',
@@ -2207,6 +4243,7 @@
         }
         el.auditName.value = '';
         el.repeatDays.value = '0';
+        el.auditPeriod.value = '';
         targetState.offset = 0;
         targetState.signature = '';
         clearFile();
@@ -2236,17 +4273,49 @@
   el.exportBtn.addEventListener('click', downloadExport);
 
   // ---------- Boot ----------
+  if (el.globalSearch) {
+    el.globalSearch.addEventListener('input', function () {
+      var value = el.globalSearch.value.trim();
+      clearTimeout(globalSearchTimer);
+      if (value.length < 2) return;
+      globalSearchTimer = setTimeout(function () {
+        el.dataSearch.value = value;
+        setDataView('search');
+        loadSearch();
+      }, 250);
+    });
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+    var tag = (event.target && event.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target.isContentEditable) return;
+    if (!el.globalSearch) return;
+    event.preventDefault();
+    el.globalSearch.focus();
+  });
+
+  decorateIcons();
   readUrlState();
   el.targetSearch.value = targetState.query;
   el.targetStatus.value = targetState.status;
   el.targetPlatform.value = targetState.platform;
+  el.accountSearch.value = accountState.query;
+  el.accountLevel.value = accountState.level;
+  el.accountBand.value = accountState.band;
+  el.accountPlatform.value = accountState.platform;
+  updateAccountSortHeaders();
   el.auditSelect.value = currentAuditId ? String(currentAuditId) : '';
   updateTargetSortHeaders();
   updateActivitySortHeaders();
   updateAppendUi();
   renderWorker(null);
   updateAuditMeta();
-  setTab(initialTab);
+  if (initialPage === 'targets' || initialPage === 'accounts' || initialPage === 'search') {
+    setDataView(initialPage);
+  } else {
+    setPage(initialPage);
+  }
   pollOnce();
   connectStream();
 })();

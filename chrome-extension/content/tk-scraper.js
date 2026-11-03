@@ -15,8 +15,11 @@
 (function() {
   'use strict';
 
-  // truncateText lives in content/common.js (shared with the Instagram scraper).
+  // parseCount, truncateText and errorResult live in content/common.js, shared
+  // with the Instagram scraper.
   const truncateText = SA_CONTENT.truncateText;
+  const parseCount = SA_CONTENT.parseCount;
+  const errorResult = SA_CONTENT.errorResult;
 
   function detectBlockState() {
     const path = (window.location.pathname || '').toLowerCase();
@@ -35,47 +38,6 @@
       || body.includes('akun ini privat')
     ) return 'PERMANENT';
     return null;
-  }
-
-  // Parse count strings like "12.5K", "1.2M", "1234", "23rb"
-  function parseCount(value) {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'number') return Number.isFinite(value) ? Math.round(value) : null;
-
-    let text = String(value).trim().toLowerCase().replace(/\s+/g, '');
-    if (!text) return null;
-
-    // Indonesian suffixes
-    text = text.replace(/ribu|rb/g, 'k').replace(/juta|jt/g, 'm').replace(/miliar/g, 'b');
-
-    const match = text.match(/^([\d.,]+)([kmb])?/);
-    if (!match) return null;
-
-    const raw = match[1];
-    const suffix = match[2] || '';
-    const multipliers = { k: 1e3, m: 1e6, b: 1e9 };
-    let number = null;
-
-    if (suffix) {
-      // "1.2K"/"1,2K" => decimal; "1.234.567K" => grouped
-      if (/^\d{1,3}([.,]\d{3}){2,}$/.test(raw)) {
-        number = parseFloat(raw.replace(/[.,]/g, ''));
-      } else {
-        number = parseFloat(raw.replace(/,/g, '.'));
-      }
-    } else if (/^\d{1,3}([.,]\d{3})+$/.test(raw)) {
-      // "1.234" / "1,234" => thousands grouping, not 1.234 followers
-      number = parseFloat(raw.replace(/[.,]/g, ''));
-    } else if (/^\d+$/.test(raw)) {
-      number = parseInt(raw, 10);
-    } else if (/^\d+[.,]\d{1,2}$/.test(raw)) {
-      number = parseFloat(raw.replace(',', '.'));
-    } else {
-      number = parseFloat(raw.replace(/[^\d.]/g, ''));
-    }
-
-    if (!Number.isFinite(number)) return null;
-    return Math.round(number * (multipliers[suffix] || 1));
   }
 
   // ============================================================
@@ -105,6 +67,7 @@
           const stats = itemStruct.stats || itemStruct.statsV2 || {};
           const author = itemStruct.author || {};
           return {
+            kind: 'post',
             platform: 'tiktok',
             url: window.location.href,
             username: author.uniqueId || null,
@@ -113,7 +76,8 @@
             views: parseCount(stats.playCount ?? null),
             shares: parseCount(stats.shareCount ?? null),
             caption: truncateText(itemStruct.desc || '', 500) || null,
-            postDate: itemStruct.createTime ? new Date(itemStruct.createTime * 1000).toISOString().substring(0, 10) : null,
+            // Full ISO instant: upload time (not just the date) is evidence.
+            postDate: itemStruct.createTime ? new Date(itemStruct.createTime * 1000).toISOString() : null,
             followerCount: null,
             status: 'OK',
             errorCode: null,
@@ -131,9 +95,16 @@
         const stats = userInfo.stats || {};
         if (user.uniqueId) {
           return {
+            kind: 'profile',
             platform: 'tiktok',
             url: window.location.href,
             username: user.uniqueId,
+            accountId: user.id ? String(user.id) : null,
+            externalId: user.secUid ? String(user.secUid) : null,
+            displayName: user.nickname || null,
+            bio: truncateText(user.signature || '', 300) || null,
+            region: user.region || null,
+            isVerified: user.verified === undefined ? null : Boolean(user.verified),
             followerCount: parseCount(stats.followerCount ?? null),
             followingCount: parseCount(stats.followingCount ?? null),
             heartCount: parseCount(stats.heartCount ?? null),
@@ -176,6 +147,7 @@
       const authorStats = data.UserModule?.stats?.[authorId] || {};
 
       return {
+        kind: 'post',
         platform: 'tiktok',
         url: window.location.href,
         username: authorData.uniqueId || authorId || null,
@@ -184,7 +156,7 @@
         views: parseCount(stats.playCount ?? null),
         shares: parseCount(stats.shareCount ?? null),
         caption: truncateText(item.desc || '', 500) || null,
-        postDate: item.createTime ? new Date(item.createTime * 1000).toISOString().substring(0, 10) : null,
+        postDate: item.createTime ? new Date(item.createTime * 1000).toISOString() : null,
         followerCount: parseCount(authorStats.followerCount ?? null),
         status: 'OK',
         errorCode: null,
@@ -202,6 +174,52 @@
   // often returns statusCode 10204 in rehydration but renders
   // the data via client-side JavaScript.
   // ============================================================
+
+  // metricFromLabel (label -> likes/comments/shares) lives in content/common.js.
+  const metricFromLabel = SA_CONTENT.metricFromLabel;
+
+  function labelOf(node) {
+    if (!node) return null;
+    return (
+      metricFromLabel(node.getAttribute('data-e2e'))
+      || metricFromLabel(node.getAttribute('aria-label'))
+      || metricFromLabel(node.getAttribute('title'))
+      || metricFromLabel(node.getAttribute('class'))
+    );
+  }
+
+  /**
+   * Walk outward from a counter element and return the metric it displays.
+   * Nearest label wins: TikTok wraps the whole action bar in containers whose
+   * class names mention every metric, so a deep search would mislabel.
+   */
+  function metricForCountElement(el) {
+    const direct = labelOf(el);
+    if (direct) return direct;
+
+    let node = el.parentElement;
+    for (let depth = 0; node && depth < 4; depth += 1) {
+      const own = labelOf(node);
+      if (own) return own;
+
+      // Inside one action button the <strong> is unlabelled but its icon is not.
+      const metrics = new Set();
+      for (const icon of node.querySelectorAll('[data-e2e]')) {
+        const metric = metricFromLabel(icon.getAttribute('data-e2e'));
+        if (metric) metrics.add(metric);
+      }
+      if (metrics.size === 1) return metrics.values().next().value;
+
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  function countFromElement(el) {
+    const count = parseCount(el.getAttribute('title'));
+    return count === null ? parseCount(el.textContent) : count;
+  }
+
   function extractFromDOM() {
     const result = {
       platform: 'tiktok',
@@ -228,7 +246,6 @@
     const e2eMap = {
       'like-count': 'likes',
       'browse-like-count': 'likes',
-      'undefined-count': 'likes', // TikTok sometimes does this
       'comment-count': 'comments',
       'browse-comment-count': 'comments',
       'share-count': 'shares',
@@ -239,54 +256,26 @@
       if (result[field] !== null) continue;
       const el = document.querySelector(`[data-e2e="${attr}"]`);
       if (el) {
-        let count = parseCount(el.getAttribute('title'));
-        if (count === null) count = parseCount(el.textContent);
+        const count = countFromElement(el);
         if (count !== null) result[field] = count;
       }
     }
 
-    // --- FALLBACK: Read counts from buttons with <strong> children ---
-    // TikTok video pages have action buttons (like, comment, bookmark, share)
-    // Each button contains an SVG icon and a <strong> with the count
-    if (result.likes === null) {
-      const allStrongs = [];
-      
-      // Method A: Look for buttons containing strong elements
-      document.querySelectorAll('button').forEach(btn => {
-        const strong = btn.querySelector('strong');
-        if (strong) {
-          let count = parseCount(strong.getAttribute('title'));
-          if (count === null) count = parseCount(strong.textContent);
-          if (count !== null) allStrongs.push({ count, el: strong });
-        }
-      });
-      
-      // Method B: Look for any strong elements near action icons
-      document.querySelectorAll('[class*="DivAction"] strong, [class*="action-bar"] strong, [class*="ButtonAction"] strong').forEach(el => {
-        let count = parseCount(el.getAttribute('title'));
-        if (count === null) count = parseCount(el.textContent);
-        if (count !== null) allStrongs.push({ count, el });
-      });
-
-      // Deduplicate by count value while preserving order
-      const seen = new Set();
-      const uniqueCounts = [];
-      for (const item of allStrongs) {
-        const key = item.count + '_' + item.el.textContent;
-        if (!seen.has(key)) {
-          seen.add(key);
-          uniqueCounts.push(item.count);
-        }
-      }
-
-      // TikTok order: likes, comments, bookmarks/favorites, shares
-      if (uniqueCounts.length >= 2) {
-        result.likes = uniqueCounts[0];
-        result.comments = uniqueCounts[1];
-        if (uniqueCounts.length >= 4) result.shares = uniqueCounts[3];
-      } else if (uniqueCounts.length === 1) {
-        result.likes = uniqueCounts[0];
-      }
+    // --- FALLBACK: labelled action-bar counters ---
+    // Deliberately not positional. The action bar's button order and count
+    // change (bookmarks, duets, disabled comments), and reading
+    // [0]=likes / [1]=comments / [3]=shares silently swapped metrics while
+    // still reporting status OK. A counter here is accepted only if a label
+    // identifies it; anything unlabelled stays null so the gap is visible.
+    const countCandidates = document.querySelectorAll(
+      'button strong, button [data-e2e$="-count"], [class*="DivAction"] strong, '
+      + '[class*="action-bar"] strong, [class*="ButtonAction"] strong, [data-e2e$="-count"]'
+    );
+    for (const el of countCandidates) {
+      const metric = metricForCountElement(el);
+      if (!metric || result[metric] !== null) continue;
+      const count = countFromElement(el);
+      if (count !== null) result[metric] = count;
     }
 
     // --- VIEWS ---
@@ -302,8 +291,7 @@
       if (result.views !== null) break;
       const el = document.querySelector(sel);
       if (el) {
-        let count = parseCount(el.getAttribute('title'));
-        if (count === null) count = parseCount(el.textContent);
+        const count = countFromElement(el);
         if (count !== null) result.views = count;
       }
     }
@@ -324,20 +312,18 @@
     }
 
     // --- FOLLOWER COUNT (profile pages) ---
-    const followerSelectors = [
-      '[data-e2e="followers-count"]',
-      '[title][class*="CountInfo"]:nth-child(2)',
-    ];
-    for (const sel of followerSelectors) {
-      const el = document.querySelector(sel);
-      if (el) {
-        let count = parseCount(el.getAttribute('title'));
-        if (count === null) count = parseCount(el.textContent);
-        if (count !== null) {
-          result.followerCount = count;
-          break;
-        }
-      }
+    // The header renders Following / Followers / Likes as sibling nodes, so
+    // picking one by position can report the wrong number. Match the label.
+    let followerEl = document.querySelector('[data-e2e="followers-count"]');
+    if (!followerEl) {
+      followerEl = Array.from(
+        document.querySelectorAll('[class*="CountInfo"], [class*="user-count"], [class*="real-followers"]')
+      ).find((el) => /follower|pengikut/i.test(el.textContent || '')
+        && !/following|mengikuti|like|suka/i.test(el.textContent || ''));
+    }
+    if (followerEl) {
+      const count = countFromElement(followerEl.querySelector('strong') || followerEl);
+      if (count !== null) result.followerCount = count;
     }
 
     return result;
@@ -420,6 +406,20 @@
     });
   }
 
+  /**
+   * A post result must carry at least one number.
+   *
+   * On a profile page the rehydration blob has no `likes` key, so the old
+   * `result.likes !== null` test passed through `undefined` and a profile visit
+   * was reported as a finished post with every metric empty.
+   */
+  function hasAnyPostMetric(result) {
+    if (!result) return false;
+    return ['likes', 'comments', 'views', 'shares'].some(
+      (field) => typeof result[field] === 'number' && Number.isFinite(result[field])
+    );
+  }
+
   // ============================================================
   // MAIN: Scrape TikTok Post (Video Page)
   // ============================================================
@@ -428,14 +428,14 @@
 
     // Step 1: Try rehydration immediately (fast path)
     let result = extractFromRehydration();
-    if (result && result.likes !== null) {
+    if (result && result.kind === 'post' && hasAnyPostMetric(result)) {
       console.log('[SA] Got data from Rehydration!', result);
       return result;
     }
 
     // Step 2: Try SIGI_STATE
     result = extractFromSigiState();
-    if (result && result.likes !== null) {
+    if (result && result.kind === 'post' && hasAnyPostMetric(result)) {
       console.log('[SA] Got data from SIGI_STATE!', result);
       return result;
     }
@@ -453,9 +453,10 @@
 
     // Step 6: If DOM also failed, try rehydration one more time
     // (TikTok might have updated the script tag after hydration)
-    if (result && result.likes === null) {
+    if (result && !hasAnyPostMetric(result)) {
       const rehydrationRetry = extractFromRehydration();
-      if (rehydrationRetry && rehydrationRetry.likes !== null) {
+      if (rehydrationRetry && rehydrationRetry.kind === 'post'
+        && hasAnyPostMetric(rehydrationRetry)) {
         console.log('[SA] Rehydration succeeded on retry!');
         result = rehydrationRetry;
       }
@@ -502,52 +503,172 @@
   }
 
   // ============================================================
+  // PROFILE: recent posts, collected during the same visit
+  // ============================================================
+  function readFollowerCountFromDom() {
+    const el = document.querySelector('[data-e2e="followers-count"]');
+    if (el) {
+      const fromTitle = parseCount(el.getAttribute('title'));
+      if (fromTitle !== null) return fromTitle;
+      const fromText = parseCount(el.textContent);
+      if (fromText !== null) return fromText;
+    }
+    const strong = document.querySelector('[class*="follower"] strong, [class*="Follower"] strong');
+    if (strong) {
+      const fromTitle = parseCount(strong.getAttribute('title'));
+      if (fromTitle !== null) return fromTitle;
+      return parseCount(strong.textContent);
+    }
+    return null;
+  }
+
+  /**
+   * secUid is what the item-list API needs. It is inside the rehydration blob on
+   * a normal page and anywhere in the page scripts when that blob is missing.
+   */
+  function findSecUid() {
+    const scripts = document.querySelectorAll('script');
+    for (const script of scripts) {
+      const text = script.textContent || '';
+      if (!text.includes('secUid')) continue;
+      const match = text.match(/"secUid"\s*:\s*"([^"]{10,})"/);
+      if (match) return match[1];
+    }
+    return null;
+  }
+
+  async function fetchItemListPosts(secUid, uniqueId) {
+    if (!secUid) return null;
+    const query = new URLSearchParams({
+      aid: '1988',
+      app_name: 'tiktok_web',
+      device_platform: 'webapp',
+      browser_language: (navigator.language || 'id-ID'),
+      count: String(SA_CONTENT.RECENT_POST_LIMIT),
+      cursor: '0',
+      coverType: 'jpg',
+      itemType: '0',
+      secUid: secUid,
+    });
+
+    // Without a ceiling this fetch could hold the worker for the full scrape
+    // timeout; a profile visit that cannot list posts falls back to the grid.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(`https://www.tiktok.com/api/post/item_list/?${query}`, {
+        credentials: 'include',
+        headers: { 'Accept': 'application/json,text/plain,*/*' },
+        signal: controller.signal,
+      });
+      if (!response.ok) return null;
+
+      const data = JSON.parse(await response.text());
+      const items = Array.isArray(data.itemList) ? data.itemList
+        : (Array.isArray(data.data && data.data.itemList) ? data.data.itemList : null);
+      if (!items) return null;
+
+      return SA_CONTENT.recentPosts(items.map((item) => {
+        const stats = item.stats || item.statsV2 || {};
+        return {
+          id: item.id,
+          url: uniqueId ? `https://www.tiktok.com/@${uniqueId}/video/${item.id}` : null,
+          postedAt: item.createTime,
+          likes: stats.diggCount ?? stats.heartCount ?? null,
+          comments: stats.commentCount ?? null,
+          shares: stats.shareCount ?? null,
+          views: stats.playCount ?? null,
+          caption: item.desc,
+          isVideo: item.imagePost ? false : true,
+        };
+      }));
+    } catch (error) {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Last resort: the links in the profile grid. Only ids and URLs are claimed
+   * here — card text mixes captions with counters, and a guessed number in an
+   * evidence table is worse than an empty one.
+   */
+  function gridPosts() {
+    const links = document.querySelectorAll('a[href*="/video/"], a[href*="/photo/"]');
+    const seen = new Set();
+    const posts = [];
+    for (const link of links) {
+      const href = link.href || '';
+      const match = href.match(/\/(?:video|photo)\/(\d+)/);
+      if (!match || seen.has(match[1])) continue;
+      seen.add(match[1]);
+      posts.push({ id: match[1], url: href.split('?')[0] });
+      if (posts.length >= SA_CONTENT.RECENT_POST_LIMIT) break;
+    }
+    return SA_CONTENT.recentPosts(posts);
+  }
+
+  // ============================================================
   // MAIN: Scrape TikTok Profile Page
   // ============================================================
-  async function scrapeTikTokProfile() {
+  async function scrapeTikTokProfile(requestedUsername) {
     console.log('[SA] Starting TikTok profile scrape...');
 
     const urlMatch = window.location.pathname.match(/\/@([^/]+)/);
-    const username = urlMatch ? urlMatch[1] : null;
+    const pathUsername = urlMatch ? urlMatch[1] : (requestedUsername || null);
 
-    // Step 1: Try rehydration (works well for profile pages)
-    const rehydrationData = extractFromRehydration();
-    if (rehydrationData && rehydrationData.followerCount !== null) {
-      console.log('[SA] Profile data from Rehydration:', rehydrationData.followerCount);
-      return {
-        followerCount: rehydrationData.followerCount,
-        username: rehydrationData.username || username,
+    // Rehydration carries the identity fields; a DOM-only page only has counts.
+    let profile = extractFromRehydration();
+    if (!profile || profile.kind !== 'profile' || profile.followerCount === null) {
+      await waitForProfileData(6000);
+      await new Promise(r => setTimeout(r, 300));
+      const identity = profile && profile.username ? profile : {};
+      profile = {
+        username: identity.username || pathUsername,
+        followerCount: readFollowerCountFromDom(),
+        followingCount: identity.followingCount ?? null,
+        videoCount: identity.videoCount ?? null,
+        accountId: identity.accountId || null,
+        externalId: identity.externalId || null,
+        displayName: identity.displayName || null,
+        bio: identity.bio || null,
+        region: identity.region || null,
+        isVerified: identity.isVerified !== undefined ? identity.isVerified : null,
       };
     }
 
-    // Step 2: Wait for DOM
-    await waitForProfileData(6000);
-    await new Promise(r => setTimeout(r, 300));
+    const username = profile.username || pathUsername || null;
+    const secUid = profile.externalId || findSecUid() || null;
 
-    // Step 3: DOM extraction
-    let followerCount = null;
-
-    // data-e2e attribute
-    const el = document.querySelector('[data-e2e="followers-count"]');
-    if (el) {
-      followerCount = parseCount(el.getAttribute('title'));
-      if (followerCount === null) followerCount = parseCount(el.textContent);
+    let posts = await fetchItemListPosts(secUid, username);
+    let postSource = 'item-list';
+    if (!posts || posts.length === 0) {
+      posts = gridPosts();
+      postSource = posts.length ? 'grid' : null;
     }
 
-    // Fallback: Any element with class containing "follower" and a strong child
-    if (followerCount === null) {
-      const strong = document.querySelector('[class*="follower"] strong, [class*="Follower"] strong');
-      if (strong) {
-        followerCount = parseCount(strong.getAttribute('title'));
-        if (followerCount === null) followerCount = parseCount(strong.textContent);
-      }
-    }
+    const followerCount = profile.followerCount === undefined ? null : profile.followerCount;
+    console.log('[SA] Profile scrape:', followerCount, 'followers,', posts.length, 'posts via', postSource);
 
-    console.log('[SA] Profile followerCount:', followerCount);
     return {
-      followerCount,
+      platform: 'tiktok',
+      url: window.location.href,
       username: username,
-      errorCode: followerCount === null ? detectBlockState() : null,
+      accountId: profile.accountId || null,
+      externalId: secUid,
+      displayName: profile.displayName || null,
+      bio: profile.bio || null,
+      region: profile.region || null,
+      isVerified: profile.isVerified,
+      followerCount: followerCount,
+      followingCount: profile.followingCount ?? null,
+      postCount: profile.videoCount ?? null,
+      posts: posts,
+      postSource: postSource,
+      status: followerCount !== null || posts.length > 0 ? 'OK' : 'FAILED',
+      errorCode: followerCount === null && posts.length === 0 ? detectBlockState() : null,
+      scrapedAt: new Date().toISOString(),
     };
   }
 
@@ -556,11 +677,15 @@
   // ============================================================
   chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'scrapePost') {
-      scrapeTikTokPost(request.linkObj).then(sendResponse);
+      scrapeTikTokPost(request.linkObj)
+        .catch((error) => errorResult('tiktok', window.location.href, error))
+        .then(sendResponse);
       return true;
     }
     if (request.action === 'scrapeProfile') {
-      scrapeTikTokProfile().then(sendResponse);
+      scrapeTikTokProfile(request.username)
+        .catch((error) => errorResult('tiktok', window.location.href, error))
+        .then(sendResponse);
       return true;
     }
   });

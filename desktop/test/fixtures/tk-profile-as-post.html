@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>tiktok profile payload on a post URL</title>
+</head>
+<body>
+  <!-- The audit bug: this blob is `webapp.user-detail`, so it has no likes and
+       used to be returned as a finished post. Nothing here carries a counter,
+       so a correct scrape has to fail instead of reporting an empty success. -->
+  <script type="application/json" id="__UNIVERSAL_DATA_FOR_REHYDRATION__">
+  {"__DEFAULT_SCOPE__":{"webapp.user-detail":{"statusCode":0,"userInfo":{
+    "user":{"id":"6789012345678","uniqueId":"demo.akun","secUid":"MS4wLjABAAAAdemo",
+            "nickname":"Demo Akun","signature":"bio","region":"ID","verified":false},
+    "stats":{"followerCount":7400,"followingCount":12,"heartCount":900,"videoCount":44}
+  }}}}
+  </script>
+</body>
+</html>

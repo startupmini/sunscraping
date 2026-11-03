@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>sunscraping session bridge</title>
+  <style>
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 14px;
+      font: 13px/1.45 system-ui, sans-serif;
+      color: #1b1b1b;
+    }
+    h1 { font-size: 14px; margin: 0 0 6px; }
+    p { margin: 0 0 10px; color: #555; }
+    button {
+      width: 100%;
+      padding: 9px 12px;
+      font: inherit;
+      font-weight: 600;
+      color: #fff;
+      background: #1f6feb;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:disabled { background: #9aa4b2; cursor: default; }
+    pre {
+      margin: 10px 0 0;
+      padding: 8px;
+      background: #f4f5f7;
+      border-radius: 6px;
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ekspor sesi sunscraping</h1>
+  <p>Membaca cookie Instagram &amp; TikTok dari profil Chrome yang sedang aktif, lalu menyimpannya sebagai berkas JSON.</p>
+  <button id="export">Ekspor sesi</button>
+  <pre id="log">Belum ada yang diekspor.</pre>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,3 +1,6 @@
+# Node (desktop app)
+node_modules/
+
 # Python
 __pycache__/
 *.pyc
@@ -7,6 +10,7 @@ dist/
 build/
 venv/
 .venv/
+.pytest_cache/
 
 # Database
 *.db
@@ -18,7 +22,14 @@ backend/*.db.bak
 backend/server.pid
 backend/runtime/
 backend/.api_key
+backend/.api_key.bak
 backend/.session_secret
+backups/
+
+# Session cookies for the logged-in Instagram/TikTok browser. Empty now, but it
+# holds live, bearer-grade credentials the moment the worker is paired — never
+# upload these.
+session-cookies.json
 
 # Environment
 .env
@@ -26,10 +37,11 @@ backend/.session_secret
 # Installer scratch (downloaded by INSTALL_sunscraping.bat)
 python_installer.exe
 
-# IDE
+# IDE / local tool state
 .vscode/
 .idea/
 .qoder/settings.local.json
+.freebuff/
 *.swp
 *.swo
 
@@ -37,3 +49,11 @@ python_installer.exe
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# Local UI check tooling (puppeteer-core screenshots)
+.uicheck/
+
+# Catatan internal / strategi pribadi — tidak ikut repo
+RANGKUMAN-KEINGINAN.md
+QODER.md
+PLAN-UI-PROFESIONAL.md

@@ -126,7 +126,7 @@ class ApiSmokeTest(unittest.TestCase):
             },
             {
                 'status': 'FAILED', 'platform': 'tiktok', 'username': 'bob',
-                'error': 'Postingan private', 'errorCode': 'PERMANENT',
+                'error': 'TikTok meminta coba lagi nanti', 'errorCode': 'THROTTLED',
             },
             {
                 'status': 'PARTIAL', 'platform': 'instagram', 'username': 'carol',
@@ -200,6 +200,7 @@ class ApiSmokeTest(unittest.TestCase):
         retry_payload = retry.get_json()
         self.assertTrue(retry_payload['success'])
         self.assertEqual(retry_payload['created'], 1)
+        self.assertEqual(retry_payload['skipped_permanent'], 0)
 
         next_task = self.client.get('/api/task/next', headers=API_HEADERS).get_json()
         self.assertTrue(next_task['hasTask'])
@@ -285,6 +286,148 @@ class ApiSmokeTest(unittest.TestCase):
             response.get_json()['error'],
             f'File terlalu besar (max {expected_mb}MB).',
         )
+
+
+    def test_07_error_code_inference_and_retry_policy(self):
+        infer = database._infer_error_code
+        self.assertEqual(infer('FAILED', 'Instagram meminta coba lagi nanti (throttled)', None), 'THROTTLED')
+        self.assertEqual(infer('FAILED', 'Too many requests from this IP', None), 'THROTTLED')
+        self.assertEqual(infer('FAILED', 'Backend /task/next gagal (429)', None), 'THROTTLED')
+        self.assertEqual(infer('FAILED', 'Login required / Session expired', None), 'AUTH')
+        self.assertEqual(infer('FAILED', 'Postingan tidak tersedia', None), 'PERMANENT')
+        self.assertEqual(infer('FAILED', 'Timeout - halaman terlalu lambat', None), 'TRANSIENT')
+        self.assertEqual(infer('OK', 'whatever happened', None), None)
+        self.assertEqual(infer('FAILED', 'ignored message', 'THROTTLED'), 'THROTTLED')
+        self.assertEqual(infer('FAILED', 'ignored message', 'NOT_A_CODE'), 'TRANSIENT')
+
+        def task_row(task_id):
+            conn = database.get_db_connection()
+            try:
+                row = conn.execute(
+                    'SELECT status, error_code, retry_count FROM tasks WHERE id = ?', (task_id,)
+                ).fetchone()
+                return dict(row)
+            finally:
+                conn.close()
+
+        # A throttled post stays FAILED: requeueing it would keep visiting the
+        # platform while it is pushing back. A transient one is retried.
+        self.upload(
+            [
+                ['https://www.tiktok.com/@frank/video/1111111111', 'frank', 'Kampanye F'],
+                ['https://www.tiktok.com/@grace/video/2222222222', 'grace', 'Kampanye G'],
+            ],
+            audit_name='Error Code Audit',
+        )
+
+        throttled_task = self.client.get('/api/task/next', headers=API_HEADERS).get_json()['task']
+        self.assertEqual(
+            self.client.post(
+                '/api/task/result',
+                json={
+                    'taskId': throttled_task['id'],
+                    'result': {
+                        'status': 'FAILED', 'platform': 'tiktok', 'username': 'frank',
+                        'error': 'TikTok membatasi akses (throttled)',
+                    },
+                },
+                headers=API_HEADERS,
+            ).status_code,
+            200,
+        )
+        stored = task_row(throttled_task['id'])
+        self.assertEqual(stored['status'], 'FAILED')
+        self.assertEqual(stored['error_code'], 'THROTTLED')
+        self.assertEqual(stored['retry_count'], 0)
+
+        transient_task = self.client.get('/api/task/next', headers=API_HEADERS).get_json()['task']
+        self.assertEqual(
+            self.client.post(
+                '/api/task/result',
+                json={
+                    'taskId': transient_task['id'],
+                    'result': {
+                        'status': 'FAILED', 'platform': 'tiktok', 'username': 'grace',
+                        'error': 'Timeout - halaman terlalu lambat', 'errorCode': 'TRANSIENT',
+                    },
+                },
+                headers=API_HEADERS,
+            ).status_code,
+            200,
+        )
+        stored = task_row(transient_task['id'])
+        self.assertEqual(stored['status'], 'PENDING')
+        self.assertEqual(stored['retry_count'], 1)
+
+        retried = self.client.get('/api/task/next', headers=API_HEADERS).get_json()
+        self.assertTrue(retried['hasTask'])
+        self.assertEqual(retried['task']['id'], transient_task['id'])
+
+    def test_08_permanent_failures_are_not_requeued(self):
+        """Retrying a deleted post only burns a visit; it must stay out of the queue."""
+        upload = self.upload(
+            [
+                ['https://www.tiktok.com/@henry/video/3333333333', 'henry', 'Kampanye H'],
+                ['https://www.instagram.com/p/HHH333/', 'irene', 'Kampanye I'],
+                ['https://www.tiktok.com/@jack/video/4444444444', 'jack', 'Kampanye J'],
+            ],
+            audit_name='Permanent Skip Audit',
+        ).get_json()
+        audit_id = upload['audit_id']
+
+        outcomes = {
+            'henry': {'status': 'FAILED', 'error': 'Postingan sudah dihapus', 'errorCode': 'PERMANENT'},
+            'irene': {'status': 'FAILED', 'error': 'Link tidak mengarah ke postingan', 'errorCode': 'PERMANENT'},
+            'jack': {'status': 'FAILED', 'error': 'Too many requests', 'errorCode': 'THROTTLED'},
+        }
+        for _ in range(3):
+            task = self.client.get('/api/task/next', headers=API_HEADERS).get_json()['task']
+            response = self.client.post(
+                '/api/task/result',
+                json={
+                    'taskId': task['id'],
+                    'result': {**outcomes[task['username']], 'platform': task['platform']},
+                },
+                headers=API_HEADERS,
+            )
+            self.assertEqual(response.status_code, 200)
+
+        retry = self.client.post(
+            f'/api/audits/{audit_id}/retry-failed',
+            headers=API_HEADERS,
+        ).get_json()
+        self.assertEqual(retry['created'], 1)
+        self.assertEqual(retry['skipped_permanent'], 2)
+        self.assertIn('dilewati', retry['message'])
+
+        queued = self.client.get('/api/task/next', headers=API_HEADERS).get_json()['task']
+        self.assertEqual(queued['username'], 'jack')
+
+        # With only permanent failures left, the retry says so instead of going quiet.
+        self.client.post(
+            '/api/task/result',
+            json={
+                'taskId': queued['id'],
+                'result': {'status': 'FAILED', 'error': 'Postingan private',
+                           'errorCode': 'PERMANENT', 'platform': queued['platform']},
+            },
+            headers=API_HEADERS,
+        )
+        second = self.client.post(
+            f'/api/audits/{audit_id}/retry-failed',
+            headers=API_HEADERS,
+        ).get_json()
+        self.assertEqual(second['created'], 0)
+        self.assertEqual(second['skipped_permanent'], 3)
+        self.assertIn('permanen', second['message'])
+
+    def test_09_dashboard_shows_the_real_upload_ceiling(self):
+        """The dropzone hint is rendered from the constants, not typed by hand."""
+        page = self.client.get('/').get_data(as_text=True)
+        expected_mb = str(app_module.MAX_UPLOAD_BYTES // (1024 * 1024))
+        self.assertIn(f'· {expected_mb} MB', page)
+        self.assertIn(f'maks. {app_module.MAX_ROWS:,}'.replace(',', '.'), page)
+        self.assertNotIn('12 MB', page)
 
 
 def tearDownModule():

@@ -9,75 +9,280 @@
 </head>
 <body>
 
-<header class="appbar">
-  <div class="appbar-inner">
-    <div class="brand">
+<a class="skip-link" href="#mainContent">Lewati ke konten</a>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">
       <span class="brand-mark" aria-hidden="true"><svg viewBox="6 6 36 36" focusable="false"><path fill="#FF9800" d="M11 11H37V37H11z"/><path fill="#FF9800" d="M11.272 11.272H36.728V36.728H11.272z" transform="rotate(-45.001 24 24)"/><path fill="#FFEB3B" d="M13,24c0,6.077,4.923,11,11,11c6.076,0,11-4.923,11-11s-4.924-11-11-11C17.923,13,13,17.923,13,24"/></svg></span>
       <h1 class="brand-name">sun<span class="brand-tail">scraping</span></h1>
     </div>
 
-    <div class="audit-picker">
+    <div class="sidebar-audit" id="sidebarAudit">
       <label class="sr-only" for="auditSelect">Audit aktif</label>
-      <select id="auditSelect" class="control control-audit">
-        <option value="">Semua audit</option>
-      </select>
+      <select id="auditSelect" class="control"></select>
     </div>
 
-    <div class="appbar-actions">
-      <span id="workerPill" class="pill is-idle" title="Status worker ekstensi">
+    <div class="sidebar-search">
+      <label class="sr-only" for="globalSearch">Cari data</label>
+      <input id="globalSearch" class="control" type="search" placeholder="Cari data…  /" autocomplete="off">
+    </div>
+
+    <nav class="nav" aria-label="Menu utama">
+      <button type="button" class="nav-item is-active" id="navSummary" data-page="summary" aria-current="page">Dashboard</button>
+      <button type="button" class="nav-item" id="navActivity" data-page="activity">Proses</button>
+      <button type="button" class="nav-item" id="navData" data-page="data">Data</button>
+      <button type="button" class="nav-item" id="navSettings" data-page="settings">Pengaturan</button>
+    </nav>
+  </aside>
+
+  <main class="main" id="mainContent" tabindex="-1">
+    <div id="offlineBanner" class="offline-banner" role="status" aria-live="polite" hidden>
+      <span id="offlineText">Koneksi ke backend terputus. Data yang tampil mungkin sudah lama.</span>
+      <button type="button" id="offlineRetry" class="btn btn-secondary btn-sm">Coba lagi</button>
+    </div>
+
+    <div class="status-strip" aria-label="Status sistem">
+      <span class="status-kicker">Status</span>
+      <span id="workerPill" class="pill is-idle" title="Status worker">
         <span class="pill-dot"></span>
-        <span id="workerPillText">Worker idle</span>
+        <span id="workerPillText">Worker siaga</span>
       </span>
       <span id="streamPill" class="pill" title="Status koneksi dashboard">
         <span class="pill-dot"></span>
         <span id="streamPillText">Menghubungkan…</span>
       </span>
-      <button type="button" id="openImportBtn" class="btn btn-primary btn-sm">Impor</button>
-      <button type="button" id="openExportBtn" class="btn btn-ghost btn-sm">Unduh</button>
-      <button type="button" id="openManageBtn" class="btn btn-ghost btn-icon" aria-label="Kelola audit" title="Kelola audit">⋯</button>
     </div>
-  </div>
-</header>
 
-<div id="offlineBanner" class="offline-banner" role="status" aria-live="polite" hidden>
-  <span id="offlineText">Koneksi ke backend terputus. Data yang tampil mungkin sudah lama.</span>
-  <button type="button" id="offlineRetry" class="btn btn-secondary btn-sm">Coba lagi</button>
-</div>
-
-<main class="page">
-  <section class="summary-strip" aria-label="Ringkasan audit">
-    <div class="summary-stats">
-      <span class="summary-item" data-stat="pending"><strong id="stat-pending">0</strong> menunggu</span>
-      <span class="summary-item" data-stat="running"><strong id="stat-running">0</strong> berjalan</span>
-      <span class="summary-item" data-stat="ok"><strong id="stat-ok">0</strong> selesai</span>
-      <span class="summary-item" data-stat="partial"><strong id="stat-partial">0</strong> sebagian</span>
-      <span class="summary-item" data-stat="failed"><strong id="stat-failed">0</strong> gagal</span>
-    </div>
-    <span class="summary-meta">
-      <span id="auditMeta">Memuat audit…</span>
-      <span id="lastSync" class="summary-sync"></span>
-    </span>
-  </section>
-
-  <div id="workerNotice" class="notice" role="status" hidden>
-    <span class="notice-dot" aria-hidden="true"></span>
-    <span id="workerNoticeText"></span>
-    <button type="button" id="workerNoticeDismiss" class="notice-close" aria-label="Sembunyikan pesan">&times;</button>
-  </div>
-
-  <section class="card card-table">
-    <header class="table-head">
-      <div class="tabs" role="tablist" aria-label="Tampilan data">
+    <div id="dataToolbar" class="page-toolbar" hidden>
+      <div class="subnav" role="tablist" aria-label="Jenis data">
         <button type="button" class="tab" id="tabTargets" role="tab" aria-selected="true" aria-controls="targetPanel">Target</button>
-        <button type="button" class="tab" id="tabActivity" role="tab" aria-selected="false" aria-controls="activityPanel" tabindex="-1">Aktivitas</button>
+        <button type="button" class="tab" id="tabAccounts" role="tab" aria-selected="false" aria-controls="accountPanel" tabindex="-1">Akun</button>
+        <button type="button" class="tab" id="tabSearch" role="tab" aria-selected="false" aria-controls="pageSearch" tabindex="-1">Cari</button>
       </div>
 
-      <div class="platform-legend" aria-label="Legenda platform">
-        <span class="legend-item"><span class="platform-dot instagram" aria-hidden="true"></span>Instagram</span>
-        <span class="legend-item"><span class="platform-dot tiktok" aria-hidden="true"></span>TikTok</span>
+      <div class="page-actions" id="dataActions">
+        <button type="button" id="openImportBtn" class="btn btn-primary btn-sm">Impor Excel</button>
+        <button type="button" id="openExportBtn" class="btn btn-secondary btn-sm">Unduh Excel</button>
+        <button type="button" id="openDatabaseBtn" class="btn btn-secondary btn-sm">Database</button>
+      </div>
+    </div>
+
+    <section class="page" id="pageSummary" data-page="summary">
+      <header class="page-head">
+        <div>
+          <h2>Dashboard</h2>
+          <p class="page-sub"><span id="auditMeta">Memuat audit…</span></p>
+        </div>
+        <div class="head-meta">
+          <span id="auditCost" class="meta-chip" hidden></span>
+          <span class="recap-stamp" id="summaryStamp"></span>
+        </div>
+      </header>
+
+      <div id="summaryPanel">
+      <div id="summarySkeleton" class="skeleton" aria-hidden="true">
+        <span class="skeleton-row"></span>
+        <span class="skeleton-row"></span>
+        <span class="skeleton-row"></span>
+        <span class="skeleton-row"></span>
       </div>
 
-      <div class="target-toolbar" role="search" aria-label="Cari dan filter target">
+      <div id="summaryEmpty" class="empty-state" hidden>
+        <h2>Belum ada angka untuk direkap</h2>
+        <p id="summaryEmptyCopy">Rekap terisi setelah worker menyelesaikan target pertama.</p>
+        <div class="empty-actions">
+          <button type="button" id="summaryImportBtn" class="btn btn-primary btn-sm">Impor target</button>
+        </div>
+      </div>
+
+      <div id="summaryBody" hidden>
+        <div class="kpi-grid" id="summaryKpi" role="group" aria-label="Angka utama audit"></div>
+
+        <div class="quick-actions" id="summaryActions">
+          <button type="button" class="qa" id="qaProcess">Lihat proses <span aria-hidden="true">→</span></button>
+          <button type="button" class="qa" id="qaAccounts">Data akun <span aria-hidden="true">→</span></button>
+          <button type="button" class="qa" id="qaExport">Unduh laporan <span aria-hidden="true">→</span></button>
+        </div>
+
+        <section class="recap-card is-section" id="summaryRiskCard" hidden>
+          <div class="quality-head">
+            <h3 class="recap-title">Perlu tinjauan <span class="recap-count" id="summaryRiskCount"></span></h3>
+            <button type="button" id="summaryRiskAll" class="btn btn-ghost btn-sm">Buka data akun</button>
+          </div>
+          <ul class="risk-list" id="summaryRiskList"></ul>
+        </section>
+
+        <section class="recap-card is-section">
+          <div class="quality-head">
+            <h3 class="recap-title">Kelengkapan data <span class="recap-count">per akun</span></h3>
+            <div class="quality-actions">
+              <button type="button" id="qualityInfoBtn" class="info-btn" aria-expanded="false" aria-controls="qualityInfo" aria-label="Penjelasan kelengkapan data">i</button>
+            </div>
+          </div>
+          <ul class="quality-list" id="summaryQuality"></ul>
+          <div id="qualityInfo" class="popover" hidden>
+            <p><strong>Tanpa followers</strong> — akun yang followers-nya belum pernah terukur; ER Instagram butuh angka ini.</p>
+            <p><strong>Sebagian terbaca</strong> — setidaknya satu unggahan akun hanya terbaca sebagian.</p>
+            <p><strong>TikTok tanpa views</strong> — views akun TikTok belum terbaca. Instagram tidak menampilkan views, jadi tidak dihitung.</p>
+            <p><strong>Tanpa handle</strong> — tautan tidak memuat handle, jadi ditampilkan sebagai URL.</p>
+            <p><strong>Belum diproses</strong> — belum ada satu pun snapshot untuk akun itu.</p>
+            <p><strong>Rumus ER</strong> — Instagram: (likes + komentar) ÷ followers; TikTok: (likes + komentar + share) ÷ views. Dipakai median, bukan rata-rata.</p>
+          </div>
+        </section>
+
+        <section class="recap-card is-section">
+          <h3 class="recap-title">Per platform</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="sr-only">Rekapitulasi metrik per platform</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Platform</th>
+                  <th scope="col" class="num">Target</th>
+                  <th scope="col" class="num">Terverifikasi</th>
+                  <th scope="col" class="num">Views</th>
+                  <th scope="col" class="num col-likes">Likes</th>
+                  <th scope="col" class="num col-comments">Komentar</th>
+                  <th scope="col" class="num col-share">Share</th>
+                  <th scope="col" class="num">Median ER</th>
+                </tr>
+              </thead>
+              <tbody id="summaryPlatformBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="recap-grid">
+          <section class="recap-card is-section" id="summaryTopViewsCard">
+            <div class="quality-head">
+              <h3 class="recap-title">Post teratas · views</h3>
+              <button type="button" id="topViewsAll" class="btn btn-ghost btn-sm">Lihat semua</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">Postingan dengan views tertinggi</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Akun</th>
+                    <th scope="col" class="num">Views</th>
+                    <th scope="col" class="num">Likes</th>
+                    <th scope="col" class="num">ER</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryTopViewsBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="recap-card is-section" id="summaryTopErCard">
+            <div class="quality-head">
+              <h3 class="recap-title">Post teratas · ER</h3>
+              <button type="button" id="topErAll" class="btn btn-ghost btn-sm">Lihat semua</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">Postingan dengan engagement rate tertinggi</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Akun</th>
+                    <th scope="col" class="num">ER</th>
+                    <th scope="col" class="num">Views</th>
+                    <th scope="col" class="num">Likes</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryTopErBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        <section class="recap-card is-section" id="summaryTemaCard" hidden>
+          <h3 class="recap-title">Rekap tema</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="sr-only">Metrik agregat per tema</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Tema</th>
+                  <th scope="col" class="num">Target</th>
+                  <th scope="col" class="num">Views</th>
+                  <th scope="col" class="num">Median ER</th>
+                </tr>
+              </thead>
+              <tbody id="summaryTemaBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="recap-card is-section" id="summaryAuditCard" hidden>
+          <h3 class="recap-title">Rekap audit</h3>
+          <div class="table-wrap">
+            <table>
+              <caption class="sr-only">Metrik agregat per audit</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Audit</th>
+                  <th scope="col" class="num">Target</th>
+                  <th scope="col" class="num">Terverifikasi</th>
+                  <th scope="col" class="num">Sisa</th>
+                  <th scope="col" class="num">Views</th>
+                  <th scope="col" class="num">Median ER</th>
+                </tr>
+              </thead>
+              <tbody id="summaryAuditBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <p class="recap-footnote" id="summaryFootnote"></p>
+
+        <details class="recap-card is-section summary-compare" id="pageCompare" open>
+          <summary class="recap-title">Perbandingan bulanan</summary>
+          <div class="compare-controls">
+              <label class="sr-only" for="compareMonths">Jumlah bulan</label>
+              <select id="compareMonths" class="control control-sm">
+                <option value="3">3 bulan</option>
+                <option value="6" selected>6 bulan</option>
+                <option value="12">12 bulan</option>
+              </select>
+              <button type="button" id="compareInfoBtn" class="info-btn" aria-expanded="false" aria-controls="compareInfo" aria-label="Penjelasan perbandingan">i</button>
+            </div>
+
+          <p id="compareSummary" class="panel-note" hidden></p>
+
+          <div id="compareInfo" class="popover" hidden>
+            <p>Angka tiap bulan memakai snapshot terakhir dari setiap tautan di bulan itu. Sel kosong berarti tidak ada tautan dari akun tersebut pada bulan tersebut — bukan berarti angkanya nol.</p>
+          </div>
+
+          <div id="compareBars" class="compare-bars" aria-hidden="true" hidden></div>
+
+          <div class="table-wrap compare-wrap" role="region" aria-label="Tabel perbandingan bulanan" tabindex="0">
+            <table class="compare-table">
+              <caption class="sr-only">Metrik akun per bulan</caption>
+              <thead id="compareHead"></thead>
+              <tbody id="compareBody"></tbody>
+            </table>
+          </div>
+
+          <div class="compare-foot">
+            <button type="button" id="compareMore" class="btn btn-ghost btn-sm" hidden>Tampilkan semua akun</button>
+          </div>
+
+        </details>
+      </div>
+      </div>
+    </section>
+
+    <section class="page" id="pageTargets" data-page="targets" hidden>
+      <header class="page-head">
+        <div>
+          <h2>Data target</h2>
+          <p class="page-sub">Setiap tautan yang diperiksa, dengan angka terakhir yang terbaca.</p>
+        </div>
+      </header>
+
+      <div class="target-toolbar" id="targetToolbar" role="search" aria-label="Cari dan filter target">
         <label class="sr-only" for="targetSearch">Cari target</label>
         <input id="targetSearch" class="control toolbar-search" type="search" placeholder="Cari akun, tema, link…" autocomplete="off">
         <label class="sr-only" for="targetStatus">Status</label>
@@ -94,12 +299,23 @@
           <option value="instagram">Instagram</option>
           <option value="tiktok">TikTok</option>
         </select>
+        <label class="sr-only" for="targetIssue">Kualitas data</label>
+        <select id="targetIssue" class="control control-sm">
+          <option value="">Semua kualitas</option>
+          <option value="no_followers">Tanpa followers</option>
+          <option value="no_views">Tanpa views</option>
+        </select>
       </div>
-    </header>
 
-    <p id="erInfo" class="table-note" role="note" hidden>ER (engagement rate) = (likes + komentar) ÷ followers untuk Instagram; (likes + komentar + share) ÷ views untuk TikTok.</p>
+      <p id="erInfo" class="table-note" role="note" hidden>ER (engagement rate) = (likes + komentar) ÷ followers untuk Instagram; (likes + komentar + share) ÷ views untuk TikTok.</p>
 
-    <div id="targetPanel" role="tabpanel" aria-labelledby="tabTargets">
+      <div id="targetBatch" class="batch-bar" hidden>
+        <span id="targetBatchCount">0 dipilih</span>
+        <button type="button" id="targetBatchRetry" class="btn btn-secondary btn-sm">Ulangi terpilih</button>
+        <button type="button" id="targetBatchClear" class="btn btn-ghost btn-sm">Batal</button>
+      </div>
+
+      <div id="targetPanel" class="card" role="tabpanel" aria-labelledby="tabTargets">
       <div id="targetSkeleton" class="skeleton" aria-hidden="true">
         <span class="skeleton-row"></span>
         <span class="skeleton-row"></span>
@@ -117,26 +333,29 @@
         </div>
       </div>
 
-      <div id="targetTableWrap" class="table-wrap" hidden>
+      <div id="targetTableWrap" class="table-wrap" role="region" aria-label="Tabel target" tabindex="0" hidden>
         <table>
+          <caption class="sr-only">Target audit beserta metrik terakhir yang terbaca</caption>
           <thead id="targetHead">
             <tr>
+              <th scope="col" class="col-select"><input type="checkbox" id="targetSelectAll" aria-label="Pilih semua baris di halaman ini"></th>
               <th scope="col" class="sortable" aria-sort="none">
                 <button type="button" class="sort-btn" data-target-sort="username">Akun<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="col-upload">Tgl. unggah</th>
+              <th scope="col" class="num sortable col-followers" aria-sort="none">
                 <button type="button" class="sort-btn" data-target-sort="followers">Followers<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-likes" aria-sort="none">
                 <button type="button" class="sort-btn" data-target-sort="likes">Likes<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-comments" aria-sort="none">
                 <button type="button" class="sort-btn" data-target-sort="comments">Komentar<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
               <th scope="col" class="num sortable" aria-sort="none">
                 <button type="button" class="sort-btn" data-target-sort="views">Views<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable has-info" aria-sort="none">
+              <th scope="col" class="num sortable has-info col-er" aria-sort="none">
                 <button type="button" class="sort-btn" data-target-sort="er">ER<span class="sort-ind" aria-hidden="true">↕</span></button>
                 <button type="button" id="erInfoBtn" class="info-btn" aria-expanded="false" aria-controls="erInfo" aria-label="Penjelasan ER">i</button>
               </th>
@@ -154,10 +373,45 @@
           <button type="button" id="targetNext" class="btn btn-ghost btn-sm" aria-label="Halaman berikutnya" disabled>›</button>
         </div>
       </footer>
-    </div>
+      </div>
+    </section>
 
-    <div id="activityPanel" role="tabpanel" aria-labelledby="tabActivity" hidden>
-      <div id="activitySkeleton" class="skeleton" aria-hidden="true">
+    <section class="page" id="pageActivity" data-page="activity" hidden>
+      <header class="page-head">
+        <div>
+          <h2>Proses</h2>
+          <p class="page-sub">Antrean dan hasil terbaru · klik baris untuk riwayat.</p>
+        </div>
+      </header>
+
+      <section class="process-summary" aria-label="Status antrean">          <div class="process-summary-head">
+          <div>
+            <p class="process-title"><strong id="processProgress">0%</strong> target sudah diperiksa</p>
+            <p id="processSub" class="process-sub">Belum ada target pada audit ini.</p>
+          </div>
+          <div class="process-actions">
+            <span id="activitySync" class="summary-sync"></span>
+            <button type="button" id="processRetryBtn" class="btn btn-secondary btn-sm" hidden>Ulangi target gagal</button>
+          </div>
+        </div>
+        <div id="processBar" class="status-bar" role="img" aria-label="Proporsi status target"></div>
+        <ul class="process-legend status-legend" aria-live="polite" aria-atomic="false">
+          <li class="summary-item" data-stat="ok"><span class="legend-dot is-ok"></span><strong id="stat-ok">0</strong><span>Selesai</span></li>
+          <li class="summary-item" data-stat="partial"><span class="legend-dot is-partial"></span><strong id="stat-partial">0</strong><span>Sebagian</span></li>
+          <li class="summary-item" data-stat="running"><span class="legend-dot is-running"></span><strong id="stat-running">0</strong><span>Berjalan</span></li>
+          <li class="summary-item" data-stat="pending"><span class="legend-dot is-pending"></span><strong id="stat-pending">0</strong><span>Menunggu</span></li>
+          <li class="summary-item" data-stat="failed"><span class="legend-dot is-failed"></span><strong id="stat-failed">0</strong><span>Gagal</span></li>
+        </ul>
+
+        <div id="workerNotice" class="notice is-chip" role="status" hidden>
+          <span class="notice-dot" aria-hidden="true"></span>
+          <span id="workerNoticeText"></span>
+          <button type="button" id="workerNoticeDismiss" class="notice-close" aria-label="Sembunyikan pesan">&times;</button>
+        </div>
+      </section>
+
+      <div class="card" id="activityPanel">
+      <div id="activitySkeleton" class="skeleton" aria-hidden="true" hidden>
         <span class="skeleton-row"></span>
         <span class="skeleton-row"></span>
         <span class="skeleton-row"></span>
@@ -172,43 +426,287 @@
           <button type="button" id="activityImportBtn" class="btn btn-primary btn-sm">Impor target</button>
         </div>
       </div>
-
-      <div id="tableWrap" class="table-wrap" hidden>
+      <div id="tableWrap" class="table-wrap" role="region" aria-label="Tabel hasil terbaru" tabindex="0" hidden>
         <table>
+          <caption class="sr-only">Satu baris per unggahan; snapshot terbaru per tautan</caption>
           <thead id="activityHead">
             <tr>
               <th scope="col" class="sortable" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="account">Akun<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-followers" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="followers">Followers<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-likes" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="likes">Likes<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-comments" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="comments">Komentar<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
               <th scope="col" class="num sortable" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="views">Views<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="num sortable" aria-sort="none">
+              <th scope="col" class="num sortable col-er" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="er">ER<span class="sort-ind" aria-hidden="true">↕</span></button>
+              </th>
+              <th scope="col" class="sortable col-upload" aria-sort="none">
+                <button type="button" class="sort-btn" data-activity-sort="upload">Tgl. unggah<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
               <th scope="col" class="sortable" aria-sort="none">
                 <button type="button" class="sort-btn" data-activity-sort="status">Status<span class="sort-ind" aria-hidden="true">↕</span></button>
               </th>
-              <th scope="col" class="sortable" aria-sort="descending">
-                <button type="button" class="sort-btn" data-activity-sort="time">Waktu<span class="sort-ind" aria-hidden="true">↓</span></button>
+              <th scope="col" class="sortable col-checked" aria-sort="descending">
+                <button type="button" class="sort-btn" data-activity-sort="time">Diperiksa<span class="sort-ind" aria-hidden="true">↓</span></button>
               </th>
             </tr>
           </thead>
           <tbody id="liveFeedBody"></tbody>
         </table>
       </div>
-    </div>
-  </section>
-</main>
+      </div>
+    </section>
+
+    <section class="page" id="pageAccounts" data-page="accounts" hidden>
+      <header class="page-head">
+        <div>
+          <h2>Data akun</h2>
+          <p class="page-sub">Profil yang sudah tersimpan beserta indikasi polanya.</p>
+        </div>
+      </header>
+
+      <div id="accountPanel" class="card" role="tabpanel" aria-labelledby="tabAccounts">
+      <div class="account-toolbar" role="search" aria-label="Cari dan filter akun">
+        <label class="sr-only" for="accountSearch">Cari akun</label>
+        <input id="accountSearch" class="control toolbar-search" type="search" placeholder="Cari handle, nama, bio…" autocomplete="off">
+        <label class="sr-only" for="accountLevel">Level risiko</label>
+        <select id="accountLevel" class="control control-sm">
+          <option value="">Semua level</option>
+          <option value="curiga">Semua yang dicurigai</option>
+          <option value="pola_kembar">Pola kembar</option>
+          <option value="pola_ternak">Pola ternak</option>
+          <option value="amati">Perlu diamati</option>
+          <option value="bersih">Bersih</option>
+        </select>
+        <label class="sr-only" for="accountBand">Rentang followers</label>
+        <select id="accountBand" class="control control-sm">
+          <option value="">Semua ukuran</option>
+          <option value="ternak">Band ternak</option>
+          <option value="kecil">Di bawah band</option>
+          <option value="besar">Di atas band</option>
+        </select>
+        <label class="sr-only" for="accountPlatform">Platform</label>
+        <select id="accountPlatform" class="control control-sm">
+          <option value="">Semua platform</option>
+          <option value="instagram">Instagram</option>
+          <option value="tiktok">TikTok</option>
+        </select>
+        <button type="button" id="accountVisitBtn" class="btn btn-secondary btn-sm"
+                title="Antrekan satu kunjungan profil untuk akun yang belum punya followers/bio">Ukur profil kosong</button>
+      </div>
+
+      <p id="accountSummary" class="panel-note" hidden></p>
+
+      <p id="accountClusters" class="panel-note" hidden></p>
+
+      <div id="accountSkeleton" class="skeleton" aria-hidden="true">
+        <span class="skeleton-row"></span>
+        <span class="skeleton-row"></span>
+        <span class="skeleton-row"></span>
+      </div>
+
+      <div id="accountEmpty" class="empty-state" hidden>
+        <h2 id="accountEmptyTitle">Belum ada akun tersimpan</h2>
+        <p id="accountEmptyCopy">Akun terisi sendiri saat worker membuka link atau profil.</p>
+        <div class="empty-actions">
+          <button type="button" id="accountResetBtn" class="btn btn-secondary btn-sm" hidden>Bersihkan filter</button>
+          <button type="button" id="accountRetryBtn" class="btn btn-secondary btn-sm" hidden>Coba lagi</button>
+        </div>
+      </div>
+
+      <div id="accountTableWrap" class="table-wrap" role="region" aria-label="Tabel akun" tabindex="0" hidden>
+        <table>
+          <caption class="sr-only">Akun yang sudah dikenal beserta penilaian polanya</caption>
+          <thead id="accountHead">
+            <tr>
+              <th scope="col" class="sortable" aria-sort="none">
+                <button type="button" class="sort-btn" data-account-sort="username">Akun<span class="sort-ind" aria-hidden="true">↕</span></button>
+              </th>
+              <th scope="col" class="num sortable col-followers" aria-sort="none">
+                <button type="button" class="sort-btn" data-account-sort="followers">Followers<span class="sort-ind" aria-hidden="true">↕</span></button>
+              </th>
+              <th scope="col" class="num sortable has-info" aria-sort="none">
+                <button type="button" class="sort-btn" data-account-sort="reach">Reach<span class="sort-ind" aria-hidden="true">↕</span></button>
+                <button type="button" id="reachInfoBtn" class="info-btn" aria-expanded="false" aria-controls="reachInfo" aria-label="Penjelasan reach">i</button>
+              </th>
+              <th scope="col" class="num sortable col-posts" aria-sort="none">
+                <button type="button" class="sort-btn" data-account-sort="posts">Unggah/minggu<span class="sort-ind" aria-hidden="true">↕</span></button>
+              </th>
+              <th scope="col" class="num sortable col-audits" aria-sort="none">
+                <button type="button" class="sort-btn" data-account-sort="audits">Audit<span class="sort-ind" aria-hidden="true">↕</span></button>
+              </th>
+              <th scope="col" class="sortable col-updated" aria-sort="none">
+                <button type="button" class="sort-btn" data-account-sort="age">Diperbarui<span class="sort-ind" aria-hidden="true">↕</span></button>
+              </th>
+              <th scope="col" class="num sortable" aria-sort="none">
+                <button type="button" class="sort-btn" data-account-sort="risk">Risiko<span class="sort-ind" aria-hidden="true">↕</span></button>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="accountBody"></tbody>
+        </table>
+      </div>
+
+      <footer id="accountPager" class="pager" hidden>
+        <span id="accountPageInfo" class="pager-info">—</span>
+        <div class="pager-actions">
+          <button type="button" id="accountPrev" class="btn btn-ghost btn-sm" aria-label="Halaman sebelumnya" disabled>‹</button>
+          <button type="button" id="accountNext" class="btn btn-ghost btn-sm" aria-label="Halaman berikutnya" disabled>›</button>
+        </div>
+      </footer>
+      </div>
+
+      <p id="reachInfo" class="table-note" role="note" hidden>Reach = unggahan terbaru dibagi audiens. TikTok memakai median views ÷ followers, Instagram memakai median likes ÷ followers. Akun ternak biasanya punya reach di bawah 3% (TikTok) atau 1% (Instagram).</p>
+    </section>
+
+    <section class="page" id="pageSearch" data-page="search" role="tabpanel" aria-labelledby="tabSearch" hidden>
+      <header class="page-head">
+        <div>
+          <h2>Cari data</h2>
+          <p class="page-sub">Telusuri handle, tautan, tema, caption, atau bio yang sudah tersimpan.</p>
+        </div>
+      </header>
+
+      <div class="search-box">
+        <label class="sr-only" for="dataSearch">Kata kunci</label>
+        <input id="dataSearch" class="control" type="search" placeholder="mis. @handle, tema, atau potongan tautan" autocomplete="off">
+      </div>
+
+      <p id="searchSummary" class="page-sub" hidden></p>
+
+      <div id="searchEmpty" class="empty-state" hidden>
+        <h2 id="searchEmptyTitle">Cari data yang sudah tersimpan</h2>
+        <p id="searchEmptyCopy">Ketik minimal dua huruf. Pencarian mencakup target, akun, dan unggahan.</p>
+      </div>
+
+      <section class="card search-group" id="searchAccountsCard" hidden>
+        <h3 class="recap-title">Akun</h3>
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Akun yang cocok dengan pencarian</caption>
+            <thead>
+              <tr>
+                <th scope="col">Akun</th>
+                <th scope="col">Platform</th>
+                <th scope="col" class="num">Followers</th>
+                <th scope="col" class="num">Post</th>
+                <th scope="col">Diperbarui</th>
+              </tr>
+            </thead>
+            <tbody id="searchAccountsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card search-group" id="searchTargetsCard" hidden>
+        <h3 class="recap-title">Target audited</h3>
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Tautan yang cocok dengan pencarian</caption>
+            <thead>
+              <tr>
+                <th scope="col">Akun</th>
+                <th scope="col">Periode</th>
+                <th scope="col">Status</th>
+                <th scope="col">Diperbarui</th>
+              </tr>
+            </thead>
+            <tbody id="searchTargetsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card search-group" id="searchPostsCard" hidden>
+        <h3 class="recap-title">Unggahan tersimpan</h3>
+        <div class="table-wrap">
+          <table>
+            <caption class="sr-only">Unggahan yang cocok dengan pencarian</caption>
+            <thead>
+              <tr>
+                <th scope="col">Akun</th>
+                <th scope="col">Tanggal</th>
+                <th scope="col" class="num">Views</th>
+                <th scope="col" class="num">Likes</th>
+                <th scope="col">Caption</th>
+              </tr>
+            </thead>
+            <tbody id="searchPostsBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section class="page" id="pageSettings" data-page="settings" hidden>
+      <header class="page-head">
+        <div>
+          <h2>Pengaturan</h2>
+          <p class="page-sub">Audit aktif, penjadwalan, dan pembersihan data.</p>
+        </div>
+      </header>
+
+      <section class="card settings-card">
+        <h3 class="settings-title">Audit aktif <span class="settings-tag">Aman</span></h3>
+        <form id="settingsForm" novalidate>
+          <div class="settings-form">
+            <div class="field">
+              <label class="field-label" for="settingsName">Nama audit</label>
+              <input type="text" id="settingsName" class="control" maxlength="120" autocomplete="off">
+            </div>
+            <div class="field">
+              <label class="field-label" for="settingsRepeat">Ulangi otomatis tiap (hari)</label>
+              <input type="number" id="settingsRepeat" class="control" min="0" max="365" step="1">
+              <p class="field-hint">0 = manual. Menjalankan ulang target lama, bukan menerima batch baru.</p>
+            </div>
+            <div class="field">
+              <label class="field-label" for="settingsPeriod">Periode</label>
+              <input type="month" id="settingsPeriod" class="control">
+              <p class="field-hint">Bulan kampanye batch ini.</p>
+            </div>
+          </div>
+          <div class="settings-actions">
+            <button type="submit" id="saveSettings" class="btn btn-primary btn-sm">Simpan</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card settings-card">
+        <h3 class="settings-title">Jalankan ulang <span class="settings-tag is-warn">Biaya kunjungan</span></h3>
+        <p id="manageNote" class="page-sub" hidden>Pilih satu audit di menu untuk menjalankan aksi ini.</p>
+        <p class="page-sub">Angka lama dibuang lalu kunjungan baru diantrekan. Data akun yang sudah tersimpan tidak ikut dihapus.</p>
+        <div class="settings-actions">
+          <button type="button" id="rerunBtn" class="btn btn-secondary btn-sm" disabled>Audit ulang yang belum terverifikasi</button>
+          <button type="button" id="rerunFullBtn" class="btn btn-secondary btn-sm" disabled>Audit ulang penuh</button>
+          <button type="button" id="retryFailedBtn" class="btn btn-secondary btn-sm" disabled>Ulangi target gagal</button>
+        </div>
+        <p id="rerunCost" class="field-hint" hidden></p>
+      </section>
+
+      <section class="card settings-card">
+        <h3 class="settings-title">Worker</h3>
+        <p id="settingsWorker" class="page-sub">Memuat status worker…</p>
+        <p class="page-sub">Worker dijalankan dari popup ekstensi Chrome atau tray aplikasi desktop; dashboard ini tidak menjalankannya sendiri.</p>
+      </section>
+
+      <section class="card settings-card is-danger">
+        <h3 class="settings-title">Hapus data <span class="settings-tag is-danger">Tidak dapat dibatalkan</span></h3>
+        <p class="page-sub">Hapus audit terpilih beserta target dan snapshotnya, atau kosongkan seluruh data.</p>
+        <div class="settings-actions">
+          <button type="button" id="deleteAuditBtn" class="btn btn-danger-ghost btn-sm" disabled>Hapus audit ini</button>
+          <button type="button" id="clearBtn" class="btn btn-danger-ghost btn-sm">Kosongkan semua data</button>
+        </div>
+      </section>
+    </section>
+  </main>
+</div>
 
 <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
@@ -225,7 +723,7 @@
     <form id="uploadForm" novalidate>
       <div id="dropzone" class="dropzone dropzone-sm" role="button" tabindex="0" aria-label="Pilih file CSV atau XLSX">
         <p class="dropzone-title">Tarik file ke sini atau <span>pilih dari perangkat</span></p>
-        <p class="dropzone-hint">CSV / XLSX · maks. 10.000 baris · 12 MB</p>
+        <p class="dropzone-hint">CSV / XLSX · maks. {{ max_rows }} baris · {{ max_upload_mb }} MB</p>
         <input type="file" id="fileInput" accept=".csv,.xlsx" hidden>
       </div>
 
@@ -263,6 +761,12 @@
         </div>
       </div>
       <p id="repeatHint" class="field-hint">0 = manual.</p>
+
+      <div class="field">
+        <label class="field-label" for="auditPeriod">Periode</label>
+        <input type="month" id="auditPeriod" class="control">
+        <p class="field-hint">Bulan kampanye batch ini. Kosongkan untuk bulan berjalan.</p>
+      </div>
 
       <div class="check-row">
         <input type="checkbox" id="appendMode" disabled>
@@ -310,67 +814,54 @@
   </div>
 </div>
 
-<div id="manageModal" class="modal" hidden>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="manageTitle" aria-describedby="manageDesc">
+<div id="databaseModal" class="modal" hidden>
+  <div class="modal-card is-wide" role="dialog" aria-modal="true" aria-labelledby="databaseTitle" aria-describedby="databaseDesc">
     <div class="modal-header">
       <div>
-        <h2 id="manageTitle">Kelola audit</h2>
-        <p id="manageDesc" class="modal-sub">Tindakan untuk audit terpilih.</p>
+        <h2 id="databaseTitle">Database</h2>
+        <p id="databaseDesc" class="modal-sub">Cadangan penuh seluruh audit, target, akun, dan unggahan.</p>
       </div>
-      <button type="button" id="closeManage" class="modal-close" aria-label="Tutup kelola audit">&times;</button>
+      <button type="button" id="closeDatabase" class="modal-close" aria-label="Tutup database">&times;</button>
     </div>
 
-    <p id="manageNote" class="menu-note" hidden>Pilih satu audit di bilah atas untuk menjalankan aksi ini.</p>
-
-    <div class="menu-list">
-      <button type="button" id="rerunBtn" class="menu-item" disabled>Audit ulang</button>
-      <button type="button" id="retryFailedBtn" class="menu-item" disabled>Ulangi target gagal</button>
-      <button type="button" id="settingsBtn" class="menu-item">Pengaturan audit</button>
+    <div id="databaseStats" class="db-stats" hidden>
+      <div class="db-stat"><span class="db-stat-label">Ukuran</span><span class="db-stat-value" id="dbSize">—</span></div>
+      <div class="db-stat"><span class="db-stat-label">Audit</span><span class="db-stat-value" id="dbAudits">—</span></div>
+      <div class="db-stat"><span class="db-stat-label">Target</span><span class="db-stat-value" id="dbTargets">—</span></div>
+      <div class="db-stat"><span class="db-stat-label">Akun</span><span class="db-stat-value" id="dbAccounts">—</span></div>
+      <div class="db-stat"><span class="db-stat-label">Unggahan</span><span class="db-stat-value" id="dbPosts">—</span></div>
+      <div class="db-stat"><span class="db-stat-label">Snapshot</span><span class="db-stat-value" id="dbSnapshots">—</span></div>
     </div>
+    <p id="dbUpdated" class="field-hint">Memuat ukuran database…</p>
 
-    <div class="modal-divider"></div>
-
-    <div class="menu-list">
-      <button type="button" id="deleteAuditBtn" class="menu-item is-danger" disabled>Hapus audit</button>
-    </div>
-
-    <div class="modal-divider"></div>
-
-    <div class="danger-zone">
-      <p>Kosongkan seluruh audit, target, snapshot, dan antrean. Tindakan ini tidak bisa dibatalkan.</p>
-      <button type="button" id="clearBtn" class="btn btn-danger-ghost btn-sm">Kosongkan semua data</button>
-    </div>
-
-    <div class="modal-actions">
-      <button type="button" id="cancelManage" class="btn btn-secondary">Tutup</button>
-    </div>
-  </div>
-</div>
-
-<div id="settingsModal" class="modal" hidden>
-  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" aria-describedby="settingsSub">
-    <div class="modal-header">
-      <div>
-        <h2 id="settingsTitle">Pengaturan audit</h2>
-        <p id="settingsSub" class="modal-sub">Ubah nama dan jadwal.</p>
+    <section class="db-block">
+      <h3 class="settings-title">Unduh cadangan</h3>
+      <p class="field-hint">Satu file .db berisi semua tabel. Simpan ke drive lain sebagai cadangan bulanan.</p>
+      <div class="settings-actions">
+        <button type="button" id="dbDownloadBtn" class="btn btn-primary btn-sm">Unduh .db</button>
       </div>
-    </div>
+    </section>
 
-    <form id="settingsForm" novalidate>
-      <div class="field">
-        <label class="field-label" for="settingsName">Nama audit</label>
-        <input type="text" id="settingsName" class="control" maxlength="120" autocomplete="off">
+    <section class="db-block">
+      <h3 class="settings-title">Pulihkan cadangan <span class="settings-tag is-danger">Menimpa data</span></h3>
+      <p class="field-hint">Isi file menggantikan seluruh data saat ini. Cadangan pengaman dibuat otomatis sebelum pemulihan.</p>
+      <div id="dbDropzone" class="dropzone dropzone-sm db-drop" role="button" tabindex="0" aria-label="Pilih file cadangan .db">
+        <span class="dropzone-title">Pilih file cadangan</span>
+        <span class="dropzone-hint">.db / .sqlite · maks. {{ max_upload_mb }} MB</span>
       </div>
-      <div class="field">
-        <label class="field-label" for="settingsRepeat">Ulang otomatis (hari)</label>
-        <input type="number" id="settingsRepeat" class="control" min="0" max="365" step="1">
-        <p class="field-hint">0 = manual.</p>
+      <input type="file" id="dbFileInput" accept=".db,.sqlite,.sqlite3,.backup" hidden>
+      <div id="dbFileChip" class="file-chip" hidden>
+        <span class="file-meta">
+          <strong id="dbFileName">—</strong>
+          <span id="dbFileSize">—</span>
+        </span>
+        <button type="button" id="dbRemoveFile" class="icon-btn" aria-label="Hapus file">&times;</button>
       </div>
-      <div class="modal-actions">
-        <button type="button" id="cancelSettings" class="btn btn-secondary">Batal</button>
-        <button type="submit" id="saveSettings" class="btn btn-primary">Simpan</button>
+      <p id="dbStatus" class="upload-status" aria-live="polite"></p>
+      <div class="settings-actions">
+        <button type="button" id="dbRestoreBtn" class="btn btn-danger-ghost btn-sm" disabled>Pulihkan database</button>
       </div>
-    </form>
+    </section>
   </div>
 </div>
 
@@ -406,6 +897,69 @@
         <tbody id="historyBody"></tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<div id="accountModal" class="modal" hidden>
+  <div class="modal-card is-table" role="dialog" aria-modal="true" aria-labelledby="accountTitle" aria-describedby="accountSub">
+    <div class="modal-header">
+      <div>
+        <h2 id="accountTitle">Detail akun</h2>
+        <div id="accountSub" class="history-sub">Memuat…</div>
+      </div>
+      <button type="button" id="accountClose" class="modal-close" aria-label="Tutup detail akun">&times;</button>
+    </div>
+
+    <div id="accountRisk" class="risk-box" hidden>
+      <div class="risk-head">
+        <span id="accountRiskBadge" class="badge"></span>
+        <span id="accountRiskScore" class="risk-score"></span>
+      </div>
+      <ul id="accountFlags" class="flag-list"></ul>
+    </div>
+
+    <div id="accountProfile" class="profile-grid"></div>
+
+    <section id="accountSiblingsBox" class="detail-block" hidden>
+      <h3 class="trend-title">Akun tertaut</h3>
+      <ul id="accountSiblings" class="peer-list"></ul>
+    </section>
+
+    <section id="accountTrendBox" class="detail-block" hidden>
+      <h3 class="trend-title">Rekam jejak bulanan</h3>
+      <div class="history-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Bulan</th>
+              <th scope="col" class="num">Followers</th>
+              <th scope="col" class="num">Following</th>
+              <th scope="col" class="num">Unggahan</th>
+              <th scope="col" class="num">Kunjungan</th>
+            </tr>
+          </thead>
+          <tbody id="accountHistoryBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="accountPostsBox" class="detail-block" hidden>
+      <h3 class="trend-title">Unggahan tersimpan</h3>
+      <div class="history-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Waktu</th>
+              <th scope="col" class="num">Views</th>
+              <th scope="col" class="num">Likes</th>
+              <th scope="col" class="num">Komentar</th>
+              <th scope="col">Caption</th>
+            </tr>
+          </thead>
+          <tbody id="accountPostsBody"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 </div>
 

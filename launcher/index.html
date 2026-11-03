@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>sunscraping — Launcher</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='6 6 36 36'%3E%3Cpath fill='%23FF9800' d='M11 11H37V37H11z'/%3E%3Cpath fill='%23FF9800' d='M11.272 11.272H36.728V36.728H11.272z' transform='rotate(-45.001 24 24)'/%3E%3Cpath fill='%23FFEB3B' d='M13,24c0,6.077,4.923,11,11,11c6.076,0,11-4.923,11-11s-4.924-11-11-11C17.923,13,13,17.923,13,24'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="launcher.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="6 6 36 36" focusable="false">
+          <path fill="#FF9800" d="M11 11H37V37H11z"/>
+          <path fill="#FF9800" d="M11.272 11.272H36.728V36.728H11.272z" transform="rotate(-45.001 24 24)"/>
+          <path fill="#FFEB3B" d="M13,24c0,6.077,4.923,11,11,11c6.076,0,11-4.923,11-11s-4.924-11-11-11C17.923,13,13,17.923,13,24"/>
+        </svg>
+      </span>
+      <div class="brand-copy">
+        <span class="brand-name">sun<span>scraping</span></span>
+        <span class="brand-sub">Launcher lokal</span>
+      </div>
+    </div>
+
+    <span id="statusPill" class="status-pill is-checking" role="status" aria-live="polite">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span id="statusText">Memeriksa…</span>
+    </span>
+  </header>
+
+  <main class="shell">
+    <section class="hero panel" aria-labelledby="heroTitle">
+      <div class="hero-copy">
+        <p class="eyebrow">Kontrol lokal</p>
+        <h1 id="heroTitle">Menyiapkan launcher…</h1>
+        <p id="heroSub" class="hero-sub">Menghubungkan ke backend lokal.</p>
+
+        <div class="hero-actions">
+          <button id="btnStart" class="btn btn-primary" type="button">Mulai server</button>
+          <button id="btnStop" class="btn btn-stop" type="button" hidden>Hentikan</button>
+          <button id="btnRestart" class="btn btn-ghost" type="button" hidden>Restart</button>
+          <a id="btnDashboard" class="btn btn-secondary" href="#" target="_blank" rel="noopener" hidden>
+            Buka dashboard
+            <svg class="btn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 4h9v9"/><path d="M16 4 5 15"/>
+            </svg>
+          </a>
+        </div>
+
+        <p id="heroNote" class="hero-note" hidden></p>
+      </div>
+
+      <dl class="server-meta" aria-label="Detail server">
+        <div>
+          <dt>Endpoint</dt>
+          <dd id="metaEndpoint">—</dd>
+        </div>
+        <div>
+          <dt>PID</dt>
+          <dd id="metaPid">—</dd>
+        </div>
+        <div>
+          <dt>Versi</dt>
+          <dd id="metaVersion">—</dd>
+        </div>
+        <div>
+          <dt>Kepemilikan</dt>
+          <dd id="metaOwner">—</dd>
+        </div>
+      </dl>
+    </section>
+
+    <div class="grid">
+      <section class="panel queue-panel" aria-labelledby="queueTitle">
+        <div class="panel-head">
+          <div>
+            <h2 id="queueTitle">Antrean</h2>
+            <p class="panel-kicker">Status pekerjaan terakhir</p>
+          </div>
+          <span id="queueStamp" class="panel-meta">Menunggu server</span>
+        </div>
+
+        <div class="stats" role="group" aria-label="Statistik antrean">
+          <div class="stat">
+            <span id="statPending" class="stat-value is-pending">—</span>
+            <span class="stat-label">Menunggu</span>
+          </div>
+          <div class="stat">
+            <span id="statRunning" class="stat-value is-running">—</span>
+            <span class="stat-label">Berjalan</span>
+          </div>
+          <div class="stat">
+            <span id="statOk" class="stat-value is-ok">—</span>
+            <span class="stat-label">Selesai</span>
+          </div>
+          <div class="stat">
+            <span id="statFailed" class="stat-value is-failed">—</span>
+            <span class="stat-label">Gagal</span>
+          </div>
+        </div>
+
+        <p id="statsNote" class="panel-note">Statistik muncul saat server berjalan.</p>
+      </section>
+
+      <section class="panel access-panel" aria-labelledby="accessTitle">
+        <div class="panel-head">
+          <div>
+            <h2 id="accessTitle">Akses ekstensi</h2>
+            <p class="panel-kicker">Kredensial lokal</p>
+          </div>
+          <span class="tag">Loopback</span>
+        </div>
+
+        <div class="key-line">
+          <span class="field-label">API key</span>
+          <div class="key-value">
+            <code id="apiKeyMasked">—</code>
+            <button id="btnCopyKey" class="btn btn-small btn-secondary" type="button" disabled>Salin</button>
+          </div>
+        </div>
+        <p class="panel-note">Key lengkap tidak pernah ditampilkan. Gunakan tombol Salin untuk ekstensi.</p>
+
+        <div class="base-line">
+          <span class="field-label">API base</span>
+          <div class="base-value">
+            <code id="apiBase">http://127.0.0.1:5000</code>
+            <button id="btnCopyBase" class="icon-button" type="button" aria-label="Salin API base" title="Salin API base">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="7" y="7" width="9" height="9" rx="2"/>
+                <path d="M13 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel log-panel">
+      <details id="logDetails">
+        <summary>
+          <span class="summary-title">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 5h12M4 10h12M4 15h8"/>
+            </svg>
+            Log server
+          </span>
+          <span id="logMeta" class="summary-meta">Belum dimuat</span>
+          <svg class="chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m6 8 4 4 4-4"/>
+          </svg>
+        </summary>
+        <div class="log-body">
+          <div class="log-toolbar">
+            <code id="logPath">backend/runtime/server_log.txt</code>
+            <button id="btnRefreshLog" class="btn btn-small btn-ghost" type="button">Muat ulang</button>
+          </div>
+          <pre id="logOutput" tabindex="0">Buka panel ini untuk melihat 120 baris terakhir.</pre>
+        </div>
+      </details>
+    </section>
+
+    <footer class="page-footer">
+      <span id="launcherMeta">Launcher lokal · data tidak keluar dari perangkat ini</span>
+      <button id="btnQuit" class="link-button" type="button">Keluar launcher</button>
+    </footer>
+  </main>
+
+  <section id="closedScreen" class="closed-screen" hidden>
+    <div class="closed-card">
+      <span class="closed-mark" aria-hidden="true">
+        <svg viewBox="6 6 36 36" focusable="false">
+          <path fill="#FF9800" d="M11 11H37V37H11z"/>
+          <path fill="#FF9800" d="M11.272 11.272H36.728V36.728H11.272z" transform="rotate(-45.001 24 24)"/>
+          <path fill="#FFEB3B" d="M13,24c0,6.077,4.923,11,11,11c6.076,0,11-4.923,11-11s-4.924-11-11-11C17.923,13,13,17.923,13,24"/>
+        </svg>
+      </span>
+      <p class="eyebrow">Launcher ditutup</p>
+      <h1>Server tetap berjalan.</h1>
+      <p>Kamu bisa membuka dashboard kapan saja. Jalankan <code>START_launcher.bat</code> lagi untuk mengembalikan panel ini.</p>
+      <a id="closedDashboard" class="btn btn-secondary" href="#" target="_blank" rel="noopener">Buka dashboard</a>
+    </div>
+  </section>
+
+  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle">
+    <div class="confirm-card">
+      <span class="confirm-icon" aria-hidden="true">!</span>
+      <h2 id="confirmTitle">Konfirmasi</h2>
+      <p id="confirmBody">Tindakan ini akan mengubah status server.</p>
+      <div class="confirm-actions">
+        <button id="confirmCancel" class="btn btn-secondary" type="button">Batal</button>
+        <button id="confirmOk" class="btn btn-danger" type="button">Ya, lanjutkan</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <noscript>
+    <p class="noscript">Launcher ini membutuhkan JavaScript untuk mengontrol server.</p>
+  </noscript>
+
+  <script src="launcher.js"></script>
+</body>
+</html>

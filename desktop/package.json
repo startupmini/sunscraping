@@ -1,0 +1,16 @@
+{
+  "name": "sunscraping-desktop",
+  "productName": "sunscraping",
+  "version": "0.1.0",
+  "private": true,
+  "description": "sunscraping desktop — audit Instagram/TikTok tanpa extension, dengan backend lokal.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/",
+    "test:electron": "electron test/sessions.harness.js"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0"
+  }
+}

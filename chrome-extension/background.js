@@ -1,8 +1,13 @@
-importScripts('config.js', 'utils/rate-limiter.js');
+importScripts('config.js', 'utils/rate-limiter.js', 'utils/task-cache.js');
 
 const DEFAULT_API_BASE = SA_CONFIG.apiBase;
 const POLL_ALARM = 'sunscraping-poll';
 const SCRAPE_TIMEOUT_MS = 60000;
+// A tab can report "complete" before the content script is ready. Two retries
+// 900ms apart were not enough: 9 TikTok tasks died on "Receiving end does not
+// exist" and burned all their backend retries while the tab was still booting.
+const CONTENT_SCRIPT_ATTEMPTS = 5;
+const CONTENT_SCRIPT_RETRY_MS = 1200;
 const FOLLOWER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const WORKER_TAB_KEY = 'sa_workerTabId';
 const BLOCK_PAUSE_MS = {
@@ -25,6 +30,10 @@ let followerMemCache = new Map();
 let followerAttempts = new Set();
 let workerTabId = null;
 let pendingTabRelease = false;
+let currentCycleId = null;
+// Accounts already visited in this cycle: the harvest is once per account, and
+// an MV3 restart must not spend a second visit on the same one.
+let harvestedAccounts = new Set();
 
 const ready = RateLimiter.init()
   .then(loadConfiguration)
@@ -86,17 +95,44 @@ chrome.runtime.onInstalled.addListener(() => {
 
 function normalizeBase(value) {
   const base = String(value || '').trim().replace(/\/+$/, '');
-  return /^https?:\/\//i.test(base) ? base : DEFAULT_API_BASE;
+  try {
+    const url = new URL(base);
+    const loopback = url.hostname === 'localhost'
+      || url.hostname === '127.0.0.1'
+      || url.hostname === '::1'
+      || url.hostname === '[::1]';
+    // Same rule the options page enforces before saving: the API key only ever
+    // travels to this machine, even if storage was edited by other means.
+    if (!loopback || url.username || url.password) return DEFAULT_API_BASE;
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return DEFAULT_API_BASE;
+    return base;
+  } catch (error) {
+    return DEFAULT_API_BASE;
+  }
 }
 
 async function loadConfiguration() {
-  const data = await chrome.storage.local.get(['sa_api_base', 'sa_api_key', WORKER_TAB_KEY]);
+  const data = await chrome.storage.local.get([
+    'sa_api_base', 'sa_api_key', WORKER_TAB_KEY, 'sa_harvestedAccounts', 'sa_cycleId',
+  ]);
   apiBase = normalizeBase(data.sa_api_base);
   apiKey = String(data.sa_api_key || '').trim();
   const storedTabId = Number(data[WORKER_TAB_KEY]);
   if (Number.isFinite(storedTabId) && storedTabId > 0) {
     workerTabId = storedTabId;
   }
+  currentCycleId = data.sa_cycleId ? String(data.sa_cycleId) : null;
+  if (data.sa_harvestedAccounts && data.sa_harvestedAccounts.cycle === currentCycleId) {
+    harvestedAccounts = new Set(data.sa_harvestedAccounts.keys || []);
+  }
+}
+
+function persistHarvestedAccounts() {
+  const keys = Array.from(harvestedAccounts).slice(-1000);
+  return chrome.storage.local.set({
+    sa_harvestedAccounts: { cycle: currentCycleId, keys },
+    sa_cycleId: currentCycleId,
+  }).catch(() => {});
 }
 
 async function restoreWorkerState() {
@@ -157,6 +193,7 @@ async function setWorkerActive(active) {
 
   if (isWorkerActive) {
     await clearLastError();
+    await RateLimiter.startSession();
     scheduleNextPoll(500);
     notify('Worker aktif', 'Audit akan berjalan dengan jeda aman. Biarkan Chrome tetap terbuka.');
   } else {
@@ -217,6 +254,9 @@ function isAllowedTarget(rawUrl) {
 function classifyError(error) {
   const message = error && error.message ? error.message : String(error || '');
   if (/login|auth|session|unauthorized/i.test(message)) return 'AUTH';
+  // Without this branch the 10-minute protective pause never fired: a throttle
+  // reply fell through to TRANSIENT and the worker kept visiting.
+  if (/too many requests|rate ?limit|throttl|429|try again later|coba lagi nanti|temporarily blocked/i.test(message)) return 'THROTTLED';
   if (/private|not available|tidak tersedia|deleted/i.test(message)) return 'PERMANENT';
   if (/timeout|network|fetch|tidak dapat/i.test(message)) return 'TRANSIENT';
   return 'TRANSIENT';
@@ -260,6 +300,13 @@ async function reportResult(taskId, result) {
         body: JSON.stringify({ taskId, result }),
       });
       if (response.ok) return true;
+      // 404 means the task is already settled (a late or resent report). The
+      // backend appends one snapshot per report, so retrying would record a
+      // visit that never happened.
+      if (response.status === 404) {
+        console.warn(`[Worker] Hasil ditolak: task ${taskId} sudah selesai`);
+        return true;
+      }
       lastError = new Error(`Backend /task/result gagal (${response.status})`);
       if (response.status < 500) break;
     } catch (error) {
@@ -357,10 +404,11 @@ async function pollForTasks() {
   isPolling = true;
 
   try {
-    if (!RateLimiter.checkDailyLimit()) {
-      const message = `Batas harian ${RateLimiter.DAILY_LIMIT} task tercapai. Worker berhenti sampai besok.`;
+    if (!(await RateLimiter.hasVisitBudget())) {
+      const message = `Budget ${RateLimiter.VISIT_BUDGET} kunjungan untuk siklus ini habis `
+        + `(${RateLimiter.cycleVisits} terpakai). Worker berhenti; jalankan lagi untuk siklus berikutnya.`;
       await setLastError(message);
-      notify('Batas harian tercapai', message);
+      notify('Budget kunjungan habis', message);
       await setWorkerActive(false);
       return;
     }
@@ -369,7 +417,7 @@ async function pollForTasks() {
       const breakDuration = RateLimiter.getSessionBreakDuration();
       const breakMinutes = Math.round(breakDuration / 60000);
       console.log(`[ANTI-BAN] Session break: resting ${breakMinutes} minutes after ${RateLimiter.sessionTaskCount} tasks.`);
-      RateLimiter.resetSessionBreak();
+      await RateLimiter.resetSessionBreak();
       notify('Istirahat sesi', `Worker berhenti sementara ${breakMinutes} menit agar pola akses tetap wajar.`);
       scheduleNextPoll(breakDuration);
       return;
@@ -386,11 +434,35 @@ async function pollForTasks() {
 
     const task = data.task;
 
+    // A cycle is one run: its accounts plus their posts. Switching runs refills
+    // the budget; a task of the current cycle spends what is left of it.
+    const cycleId = task.runId ? `${task.auditId || 0}:${task.runId}` : null;
+    if (await RateLimiter.beginCycle(cycleId)) {
+      currentCycleId = cycleId;
+      harvestedAccounts = new Set();
+      // A failed profile lookup is remembered for this cycle only; carrying that
+      // guard for the lifetime of the worker left the account without a follower
+      // count until Chrome restarted the service worker.
+      followerAttempts = new Set();
+      await persistHarvestedAccounts();
+    } else {
+      currentCycleId = RateLimiter.cycleId;
+    }
+
+    if (!(await RateLimiter.hasVisitBudget())) {
+      const message = `Budget ${RateLimiter.VISIT_BUDGET} kunjungan siklus ini habis. `
+        + 'Tugas yang baru diambil akan kembali ke antrean, lalu jalankan worker lagi.';
+      await setLastError(message);
+      notify('Budget kunjungan habis', message);
+      await setWorkerActive(false);
+      return;
+    }
+
     if (RateLimiter.isWarmingUp()) {
       console.log(`[ANTI-BAN] Warm-up phase: task ${RateLimiter.totalTasksThisSession + 1}/5 (${RateLimiter.getWarmupMultiplier()}x slower)`);
     }
 
-    console.log(`[Worker] Task #${RateLimiter.dailyTaskCount + 1}/${RateLimiter.DAILY_LIMIT} | Session: ${RateLimiter.sessionTaskCount + 1}/${RateLimiter.sessionBreakThreshold} | Mode: ${RateLimiter.currentMode} | Fatigue: ${RateLimiter.getFatigueMultiplier().toFixed(1)}x`);
+    console.log(`[Worker] Kunjungan #${RateLimiter.cycleVisits + 1}/${RateLimiter.VISIT_BUDGET} siklus ${RateLimiter.cycleId || '-'} (hari ini ${RateLimiter.dailyVisits}/${RateLimiter.DAILY_VISIT_RAIL}) | Session: ${RateLimiter.sessionTaskCount + 1}/${RateLimiter.sessionBreakThreshold} | Mode: ${RateLimiter.currentMode} | Fatigue: ${RateLimiter.getFatigueMultiplier().toFixed(1)}x`);
 
     const result = await processTask(task);
 
@@ -399,8 +471,13 @@ async function pollForTasks() {
 
     const errorCode = String(result.errorCode || '').toUpperCase();
     const isBlocked = result.status === 'FAILED' && (errorCode === 'THROTTLED' || errorCode === 'AUTH');
+    // A cache hit loaded no page, so it is not a visit: charging it would make
+    // the budget run out on work the platform never saw.
+    const fromCache = result.source === 'profile-visit';
 
-    if (result.status === 'FAILED') {
+    if (fromCache) {
+      consecutiveFailures = 0;
+    } else if (result.status === 'FAILED') {
       RateLimiter.reportError();
       if (isBlocked) {
         consecutiveFailures++;
@@ -447,6 +524,13 @@ async function pollForTasks() {
       await clearLastError();
     }
 
+    if (fromCache) {
+      // Nothing was loaded, so the human-like pause would only slow the queue.
+      console.log(`[Worker] Next immediately (cache hit) | Remaining: ${Math.max(0, pendingCount - 1)}`);
+      scheduleNextPoll(400);
+      return;
+    }
+
     const nextDelay = RateLimiter.getDelay();
     const estimate = RateLimiter.estimateTime(Math.max(0, pendingCount - 1));
     console.log(`[Worker] Next in ${Math.round(nextDelay / 1000)}s | Remaining: ~${estimate.display} (${estimate.breaksEstimated} breaks)`);
@@ -484,6 +568,48 @@ async function processTask(task) {
   }
 
   try {
+    // A profile task exists so the account can be measured without waiting for
+    // one of its posts to happen to carry a handle.
+    if (task.kind === 'PROFILE') {
+      const profile = await harvestProfile(task.username, task.platform);
+      if (!profile) {
+        return {
+          status: 'FAILED',
+          kind: 'PROFILE',
+          platform: task.platform,
+          username: task.username,
+          error: 'Kunjungan profil tidak menghasilkan data',
+          errorCode: 'TRANSIENT',
+        };
+      }
+      await reportProfile(profile, task.username, task.platform);
+      return {
+        status: profile.status === 'FAILED' ? 'FAILED' : 'OK',
+        kind: 'PROFILE',
+        platform: task.platform,
+        username: task.username,
+        errorCode: profile.errorCode || null,
+      };
+    }
+
+    // The account visit already measured this post: answer without loading it.
+    const cached = TaskCache.resultFromTask(task);
+    if (cached) {
+      cached.tema = task.tema || null;
+      console.log(`[Worker] Task #${task.id} answered from the profile visit (no navigation)`);
+      return cached;
+    }
+
+    // Otherwise visit the account once per cycle. That single load yields the
+    // fingerprint, the follower count and the last posts, so the post we are
+    // about to check may already be covered.
+    const harvested = await ensureAccountHarvested(task);
+    if (harvested && harvested.match) {
+      harvested.match.tema = task.tema || null;
+      console.log(`[Worker] Task #${task.id} covered by the account visit it just made`);
+      return harvested.match;
+    }
+
     const tab = await getWorkerTab();
     const navigated = await navigateWorkerTab(tab.id, task.url, 20000);
     if (!navigated) {
@@ -530,9 +656,9 @@ function requestScrape(tabId, task) {
         if (settled) return;
         const lastError = chrome.runtime.lastError;
         const message = lastError && lastError.message ? lastError.message : '';
-        if (message && /Receiving end does not exist|Could not establish connection/i.test(message) && attempts < 2) {
+        if (message && /Receiving end does not exist|Could not establish connection/i.test(message) && attempts < CONTENT_SCRIPT_ATTEMPTS) {
           attempts++;
-          setTimeout(send, 900);
+          setTimeout(send, CONTENT_SCRIPT_RETRY_MS * attempts);
           return;
         }
         settled = true;
@@ -581,36 +707,112 @@ async function enrichFollowerCount(result, task, tabId) {
   followerAttempts.add(key);
 
   try {
-    const followerCount = await fetchFollowerCount(result.username, platform, tabId);
-    if (followerCount !== null && followerCount !== undefined) {
-      result.followerCount = followerCount;
-      followerMemCache.set(key, { value: followerCount, ts: Date.now() });
+    const profile = await harvestProfile(result.username, platform, tabId);
+    if (!profile) return;
+
+    await reportProfile(profile, result.username, platform);
+    if (profile.followerCount !== null && profile.followerCount !== undefined) {
+      result.followerCount = profile.followerCount;
+      followerMemCache.set(key, { value: profile.followerCount, ts: Date.now() });
     }
   } catch (error) {
-    console.warn('[Worker] Follower lookup failed:', error);
+    console.warn('[Worker] Profile lookup failed:', error);
   }
 }
 
-async function scrapeProfileInTab(tabId) {
+/**
+ * Store what the profile visit found: account fingerprint plus its recent posts.
+ * A failure here must not fail the post task that triggered the visit.
+ */
+async function reportProfile(profile, fallbackUsername, fallbackPlatform) {
+  const payload = {
+    ...profile,
+    platform: profile.platform || fallbackPlatform,
+    username: profile.username || fallbackUsername,
+  };
+  if (!payload.username || !payload.platform) return;
+
+  try {
+    await apiRequest('/api/account/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (error) {
+    console.warn('[Worker] Could not store profile:', error);
+  }
+}
+
+/**
+ * Visit the account once per cycle when the backend has no fresh row for it.
+ * That one load returns the fingerprint, the follower count and the last posts,
+ * so the post we are about to check may already be covered by it.
+ */
+async function ensureAccountHarvested(task) {
+  const platform = task.platform;
+  const username = task.username;
+  if (!platform || !username) return null;
+
+  const key = cacheKey(username, platform);
+  if (!TaskCache.shouldHarvestAccount(task, harvestedAccounts)) return null;
+
+  harvestedAccounts.add(key);
+  await persistHarvestedAccounts();
+
+  let profile = null;
+  try {
+    profile = await harvestProfile(username, platform);
+  } catch (error) {
+    console.warn('[Worker] Account harvest failed:', error);
+    return null;
+  }
+  if (!profile) return null;
+
+  await reportProfile(profile, username, platform);
+  if (profile.followerCount !== null && profile.followerCount !== undefined) {
+    followerMemCache.set(key, { value: profile.followerCount, ts: Date.now() });
+    // The per-post follower lookup would otherwise visit the same page again.
+    followerAttempts.add(key);
+  }
+  return { profile, match: TaskCache.fromHarvest(profile, task) };
+}
+
+async function scrapeProfileInTab(tabId, username) {
   await delay(600);
   return new Promise(resolve => {
     let settled = false;
+    let attempts = 0;
+    // The scrape now also waits for the same-origin post list of the profile.
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
       resolve(null);
-    }, 12000);
+    }, 20000);
 
-    chrome.tabs.sendMessage(tabId, { action: 'scrapeProfile' }, response => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      resolve(response ? response.followerCount : null);
-    });
+    const send = () => {
+      chrome.tabs.sendMessage(tabId, { action: 'scrapeProfile', username }, response => {
+        if (settled) return;
+        const lastError = chrome.runtime.lastError;
+        const message = lastError && lastError.message ? lastError.message : '';
+        // A missing receiver means the content script has not finished loading,
+        // not that the page is wrong: resend into the same tab rather than pay
+        // for another navigation.
+        if (message && /Receiving end does not exist|Could not establish connection/i.test(message) && attempts < CONTENT_SCRIPT_ATTEMPTS) {
+          attempts++;
+          setTimeout(send, CONTENT_SCRIPT_RETRY_MS * attempts);
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(response || null);
+      });
+    };
+
+    send();
   });
 }
 
-async function fetchFollowerCount(username, platform, reuseTabId = null) {
+async function harvestProfile(username, platform, reuseTabId = null) {
   if (!username || !platform) return null;
 
   const encoded = encodeURIComponent(username);
@@ -624,7 +826,7 @@ async function fetchFollowerCount(username, platform, reuseTabId = null) {
   if (reuseTabId) {
     try {
       await navigateWorkerTab(reuseTabId, url, 20000);
-      return await scrapeProfileInTab(reuseTabId);
+      return await scrapeProfileInTab(reuseTabId, username);
     } catch (error) {
       return null;
     }
@@ -634,7 +836,7 @@ async function fetchFollowerCount(username, platform, reuseTabId = null) {
   try {
     tab = await chrome.tabs.create({ url, active: false });
     await waitForTabComplete(tab.id, 15000);
-    return await scrapeProfileInTab(tab.id);
+    return await scrapeProfileInTab(tab.id, username);
   } catch (error) {
     return null;
   } finally {

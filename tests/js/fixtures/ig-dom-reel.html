@@ -1,0 +1,197 @@
+<!doctype html>
+<!--
+  DOM fixture for the Instagram post scraper, focused on reels pages.
+  Run through headless Chrome by tests/js/dom-ig-post.test.mjs.
+
+  Regression this file exists for: on 6 real reel links the scraper returned
+  likes/comments/views but no username, no post date and no caption, because
+  the reels layout has no header profile link and no <time> element, and the
+  media API was only consulted when the view count was missing.
+-->
+<html>
+<head><meta charset="utf-8"><title>sunscraping ig post fixtures</title></head>
+<body>
+<script src="../../../chrome-extension/content/common.js"></script>
+<script>
+  window.__saListeners = [];
+  window.chrome = {
+    runtime: {
+      lastError: null,
+      id: 'sunscraping-test',
+      onMessage: { addListener: (fn) => { window.__saListeners.push(fn); } },
+      sendMessage: () => Promise.resolve(),
+      getURL: (path) => path,
+    },
+  };
+
+  // Every same-origin request the scraper makes is answered from here.
+  window.__saFetch = null;
+  window.__saFetchCalls = [];
+  window.fetch = (url, options) => {
+    window.__saFetchCalls.push(String(url));
+    if (!window.__saFetch) return Promise.reject(new Error('no fetch stub'));
+    return window.__saFetch(url, options);
+  };
+</script>
+<script src="../../../chrome-extension/content/ig-scraper.js"></script>
+<script>
+  const REEL_URL = 'https://www.instagram.com/reel/REELCODE1/';
+
+  const mediaNode = (overrides = {}) => ({
+    id: '3390000000000000000',
+    code: 'REELCODE1',
+    media_type: 2,
+    taken_at: 1730000000,
+    like_count: 1234,
+    comment_count: 56,
+    play_count: 98765,
+    caption: { text: 'caption dari node media' },
+    user: {
+      pk: '4400112233',
+      username: 'akun.reel',
+      follower_count: 8400,
+      is_verified: false,
+      full_name: 'Akun Reel',
+    },
+    ...overrides,
+  });
+
+  const jsonScript = (object) =>
+    `<script type="application/json">${JSON.stringify(object)}<\/script>`;
+
+  const openGraph = (title, description) =>
+    `<meta property="og:title" content="${title}">`
+    + `<meta property="og:description" content="${description}">`;
+
+  const CASES = [
+    {
+      name: 'reels: media node fills handle, date and caption without an API call',
+      title: 'Akun Reel (@akun.reel) • Instagram photos and videos',
+      og: openGraph('Akun Reel (@akun.reel) on Instagram', '1,234 Likes, 56 Comments - Akun Reel (@akun.reel) on Instagram: "caption og"'),
+      meta: '1,234 Likes, 56 Comments - 98,765 views',
+      html: jsonScript({ items: [mediaNode()] }),
+      fetchStub: () => Promise.reject(new Error('API must not be called when the page is complete')),
+      expect: {
+        status: 'OK',
+        platform: 'instagram',
+        username: 'akun.reel',
+        likes: 1234,
+        comments: 56,
+        views: 98765,
+        postDate: '2024-10-27T03:33:20Z',
+        caption: 'caption dari node media',
+      },
+      check: (result) => (result.followerCount === 8400
+        ? []
+        : [`followerCount = ${JSON.stringify(result.followerCount)}, expected 8400`]),
+    },
+    {
+      name: 'reels: media API is consulted when the page only has counters',
+      title: 'Instagram',
+      og: '',
+      meta: '1,234 Likes, 56 Comments - 98,765 views',
+      html: '<div id="reels"></div>',
+      fetchStub: (url) => (url.includes('/api/v1/media/')
+        ? Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify({ items: [mediaNode({ caption: { text: 'caption dari api' } })] })) })
+        : Promise.reject(new Error('unexpected url'))),
+      expect: {
+        status: 'OK',
+        username: 'akun.reel',
+        likes: 1234,
+        comments: 56,
+        views: 98765,
+        postDate: '2024-10-27T03:33:20Z',
+        caption: 'caption dari api',
+      },
+    },
+    {
+      name: 'display name in the title never becomes a handle',
+      title: 'Salsabilla F on Instagram',
+      og: '<meta property="og:title" content="Salsabilla F on Instagram">',
+      meta: '12 Likes',
+      html: '<div id="reels"></div>',
+      fetchStub: () => Promise.reject(new Error('403')),
+      // A reel with no view count is honestly PARTIAL; the point here is that no
+      // handle was invented from the display name.
+      expect: { status: 'PARTIAL', username: null, likes: 12 },
+    },
+    {
+      name: 'classic post page: header link, <time> and h1 still work',
+      url: 'https://www.instagram.com/p/ABC123/',
+      title: 'Instagram',
+      og: '',
+      meta: '',
+      html: '<header><a href="/akun.dom/">Akun Dom</a></header>'
+        + '<h1>caption dari h1</h1>'
+        + '<a href="/p/ABC123/"><time datetime="2024-10-27T03:33:20.000Z">27 Oktober</time></a>'
+        + '<section><span>1,2K likes</span></section>',
+      fetchStub: () => Promise.reject(new Error('unexpected url')),
+      expect: {
+        status: 'OK',
+        username: 'akun.dom',
+        likes: 1200,
+        postDate: '2024-10-27T03:33:20Z',
+        caption: 'caption dari h1',
+      },
+    },
+  ];
+
+  let currentUrl = REEL_URL;
+  const scrape = () => new Promise((resolve) => {
+    const sendResponse = (result) => resolve(result || { status: 'NO_RESPONSE' });
+    try {
+      window.__saListeners[0](
+        { action: 'scrapePost', linkObj: { url: currentUrl, username: null } },
+        {},
+        sendResponse,
+      );
+    } catch (error) {
+      resolve({ status: 'HARNESS_THROW', error: String(error && error.message) });
+    }
+    setTimeout(() => resolve({ status: 'NO_RESPONSE' }), 25000);
+  });
+
+  (async () => {
+    const failures = [];
+    for (const testCase of CASES) {
+      currentUrl = testCase.url || REEL_URL;
+      document.title = testCase.title || '';
+      document.head.querySelectorAll('meta[property]').forEach((node) => node.remove());
+      document.body.innerHTML = `${testCase.og || ''}${testCase.html || ''}`;
+
+      let meta = document.querySelector('meta[name="description"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'description';
+        document.head.appendChild(meta);
+      }
+      meta.content = testCase.meta || '';
+      window.__saFetch = testCase.fetchStub || null;
+      window.__saFetchCalls = [];
+
+      const result = await scrape();
+      window.__saFetch = null;
+
+      for (const [field, expected] of Object.entries(testCase.expect)) {
+        const actual = result ? result[field] : undefined;
+        if (actual !== expected) {
+          failures.push(`${testCase.name} :: ${field} = ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)} (status=${result && result.status}, calls=${window.__saFetchCalls.length})`);
+        }
+      }
+      if (testCase.check) {
+        for (const detail of testCase.check(result || {})) {
+          failures.push(`${testCase.name} :: ${detail}`);
+        }
+      }
+    }
+
+    const verdict = document.createElement('pre');
+    verdict.id = 'verdict';
+    verdict.textContent = failures.length === 0
+      ? `ALL FIXTURES PASS (${CASES.length})`
+      : `FIXTURE FAILURES ${failures.length}\n${failures.join('\n')}`;
+    document.body.appendChild(verdict);
+  })();
+</script>
+</body>
+</html>

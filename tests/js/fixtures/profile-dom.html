@@ -1,0 +1,327 @@
+<!doctype html>
+<!--
+  DOM fixture for the profile harvesters (one visit = account + recent posts).
+  Run through headless Chrome by tests/js/dom-profile-scraper.test.mjs.
+  Script order mirrors manifest.json: content/common.js first.
+-->
+<html>
+<head><meta charset="utf-8"><title>sunscraping profile fixtures</title></head>
+<body>
+<script src="../../../chrome-extension/content/common.js"></script>
+<script>
+  window.__saListeners = [];
+  window.chrome = {
+    runtime: {
+      lastError: null,
+      id: 'sunscraping-test',
+      onMessage: { addListener: (fn) => { window.__saListeners.push(fn); } },
+      sendMessage: () => Promise.resolve(),
+      getURL: (path) => path,
+    },
+  };
+
+  // Every same-origin request the scrapers make is answered from here.
+  window.__saFetch = null;
+  window.fetch = (url, options) => {
+    if (!window.__saFetch) return Promise.reject(new Error('no fetch stub'));
+    return window.__saFetch(url, options);
+  };
+</script>
+<script src="../../../chrome-extension/content/tk-scraper.js"></script>
+<script src="../../../chrome-extension/content/ig-scraper.js"></script>
+<script>
+  // TikTok reads its rehydration blob by id, exactly like a real profile page.
+  const jsonScript = (object, id) =>
+    `<script${id ? ` id="${id}"` : ''} type="application/json">${JSON.stringify(object)}<\/script>`;
+
+  const tkRehydration = (overrides = {}) => ({
+    __DEFAULT_SCOPE__: {
+      'webapp.user-detail': {
+        statusCode: 0,
+        userInfo: {
+          user: {
+            id: '6789012345678',
+            uniqueId: 'salsaabl.f_',
+            secUid: 'MS4wLjABAAAA-long-secuid-value',
+            nickname: 'Salsaabl F',
+            signature: 'Endorse: WA 0812-3456-7890',
+            region: 'ID',
+            verified: false,
+          },
+          stats: {
+            followerCount: 7400,
+            followingCount: 12,
+            videoCount: 214,
+            heartCount: 90000,
+          },
+        },
+      },
+    },
+  });
+
+  const itemList = (count) => ({
+    itemList: Array.from({ length: count }, (_, index) => ({
+      id: String(1234567890 + index),
+      desc: `iklan ke-${index} #ad`,
+      createTime: 1730000000 + index * 86400,
+      stats: {
+        diggCount: 100 + index,
+        commentCount: 5,
+        shareCount: 2,
+        playCount: 9000 + index,
+      },
+    })),
+    hasMore: true,
+  });
+
+  const igUserNode = (options = {}) => ({
+    data: {
+      user: {
+        pk: '4400112233',
+        username: 'salsaabl.f_',
+        full_name: 'Salsaabl F',
+        biography: 'Endorse: WA 0812-3456-7890',
+        is_verified: false,
+        edge_followed_by: { count: 7400 },
+        edge_follow: { count: 12 },
+        edge_owner_to_timeline_media: {
+          count: options.totalCount || 214,
+          edges: Array.from({ length: options.edges || 12 }, (_, index) => ({
+            node: {
+              code: `CODE${index}`,
+              pk: String(9000 + index),
+              is_video: index % 2 === 0,
+              // Real payloads carry epoch seconds under `taken_at`.
+              taken_at: 1730000000 + index * 86400,
+              edge_liked_by: { count: 200 + index },
+              edge_media_to_comment: { count: 7 },
+              video_view_count: index % 2 === 0 ? 5000 + index : undefined,
+              edge_media_to_caption: { edges: [{ node: { text: `caption ke-${index}` } }] },
+            },
+          })),
+        },
+      },
+    },
+  });
+
+  const gridHtml = (count) => Array.from({ length: count }, (_, index) =>
+    `<li class="css-grid"><a href="/@salsaabl.f_/video/${2000 + index}">`
+    + `<img alt="poster"></a></li>`).join('');
+
+  const CASES = [
+    {
+      name: 'tiktok profile: rehydration identity plus item_list posts',
+      script: 'tk',
+      html: jsonScript(tkRehydration(), '__UNIVERSAL_DATA_FOR_REHYDRATION__'),
+      fetchStub: (url) => (url.includes('/api/post/item_list/')
+        ? Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify(itemList(12))) })
+        : Promise.reject(new Error('unexpected url'))),
+      expect: {
+        platform: 'tiktok',
+        username: 'salsaabl.f_',
+        accountId: '6789012345678',
+        externalId: 'MS4wLjABAAAA-long-secuid-value',
+        displayName: 'Salsaabl F',
+        bio: 'Endorse: WA 0812-3456-7890',
+        region: 'ID',
+        followerCount: 7400,
+        followingCount: 12,
+        postCount: 214,
+        postSource: 'item-list',
+        status: 'OK',
+      },
+      check: (result) => {
+        const failures = [];
+        if (!result.posts || result.posts.length !== 10) {
+          failures.push(`posts.length = ${result.posts && result.posts.length}, expected 10`);
+          return failures;
+        }
+        if (result.posts[0].id !== '1234567890') failures.push(`posts[0].id = ${result.posts[0].id}`);
+        if (result.posts[0].url !== 'https://www.tiktok.com/@salsaabl.f_/video/1234567890') {
+          failures.push(`posts[0].url = ${result.posts[0].url}`);
+        }
+        if (result.posts[0].postedAt !== '2024-10-27T03:33:20Z') {
+          failures.push(`posts[0].postedAt = ${result.posts[0].postedAt}`);
+        }
+        if (result.posts[0].views !== 9000) failures.push(`posts[0].views = ${result.posts[0].views}`);
+        if (result.posts[0].likes !== 100) failures.push(`posts[0].likes = ${result.posts[0].likes}`);
+        if (result.posts[0].caption !== 'iklan ke-0 #ad') {
+          failures.push(`posts[0].caption = ${result.posts[0].caption}`);
+        }
+        return failures;
+      },
+    },
+    {
+      name: 'tiktok profile: item_list refused falls back to the grid without metrics',
+      script: 'tk',
+      html: '<div class="HeaderPlaceholder">'
+        + '<span class="CountInfo"><strong data-e2e="followers-count" title="1500">1,5rb</strong>'
+        + `<strong>12</strong><strong>44</strong></span></div>${gridHtml(3)}`,
+      fetchStub: () => Promise.reject(new Error('403')),
+      expect: {
+        platform: 'tiktok',
+        followerCount: 1500,
+        postSource: 'grid',
+        status: 'OK',
+      },
+      check: (result) => {
+        const failures = [];
+        if (!result.posts || result.posts.length !== 3) {
+          failures.push(`posts.length = ${result.posts && result.posts.length}, expected 3`);
+          return failures;
+        }
+        if (result.posts[0].id !== '2000') failures.push(`posts[0].id = ${result.posts[0].id}`);
+        if (result.posts[0].views !== null) failures.push(`posts[0].views = ${result.posts[0].views}`);
+        if (result.posts[0].postedAt !== null) failures.push(`posts[0].postedAt = ${result.posts[0].postedAt}`);
+        return failures;
+      },
+    },
+    {
+      name: 'instagram profile: embedded timeline gives posts and totals',
+      script: 'ig',
+      meta: '7,4rb Followers, 12 Following, 214 Postingan - Salsaabl F on Instagram',
+      html: jsonScript(igUserNode()),
+      expect: {
+        platform: 'instagram',
+        username: 'salsaabl.f_',
+        accountId: '4400112233',
+        displayName: 'Salsaabl F',
+        followerCount: 7400,
+        followingCount: 12,
+        postCount: 214,
+        postSource: 'page-json',
+        status: 'OK',
+      },
+      check: (result) => {
+        const failures = [];
+        if (!result.posts || result.posts.length !== 10) {
+          failures.push(`posts.length = ${result.posts && result.posts.length}, expected 10`);
+          return failures;
+        }
+        if (result.posts[0].id !== 'CODE0') failures.push(`posts[0].id = ${result.posts[0].id}`);
+        if (result.posts[0].url !== 'https://www.instagram.com/reel/CODE0/') {
+          failures.push(`posts[0].url = ${result.posts[0].url}`);
+        }
+        if (result.posts[1].url !== 'https://www.instagram.com/p/CODE1/') {
+          failures.push(`posts[1].url = ${result.posts[1].url}`);
+        }
+        if (result.posts[0].likes !== 200) failures.push(`posts[0].likes = ${result.posts[0].likes}`);
+        if (result.posts[0].comments !== 7) failures.push(`posts[0].comments = ${result.posts[0].comments}`);
+        if (result.posts[0].views !== 5000) failures.push(`posts[0].views = ${result.posts[0].views}`);
+        if (result.posts[1].views !== null) failures.push(`posts[1].views = ${result.posts[1].views}`);
+        if (result.posts[0].postedAt !== '2024-10-27T03:33:20Z') {
+          failures.push(`posts[0].postedAt = ${result.posts[0].postedAt}`);
+        }
+        if (result.posts[0].caption !== 'caption ke-0') {
+          failures.push(`posts[0].caption = ${result.posts[0].caption}`);
+        }
+        return failures;
+      },
+    },
+    {
+      name: 'instagram profile: web_profile_info answers when the page has no timeline',
+      script: 'ig',
+      meta: '940 Followers, 30 Following, 12 Postingan - Salsaabl F on Instagram',
+      html: '<div></div>',
+      fetchStub: (url) => (url.includes('/api/v1/users/web_profile_info/')
+        ? Promise.resolve({ ok: true, text: () => Promise.resolve(JSON.stringify(igUserNode({ edges: 4, totalCount: 12 }))) })
+        : Promise.reject(new Error('unexpected url'))),
+      expect: {
+        platform: 'instagram',
+        username: 'salsaabl.f_',
+        followerCount: 940,
+        postSource: 'web-profile-api',
+        status: 'OK',
+      },
+      check: (result) => {
+        const failures = [];
+        if (!result.posts || result.posts.length !== 4) {
+          failures.push(`posts.length = ${result.posts && result.posts.length}, expected 4`);
+        }
+        if (result.postCount !== 12) failures.push(`postCount = ${result.postCount}, expected 12`);
+        return failures;
+      },
+    },
+    {
+      name: 'instagram profile: meta description fills the display name without JSON',
+      script: 'ig',
+      meta: '7,4rb Followers, 12 Following, 214 Postingan - Salsaabl F on Instagram',
+      html: '<div></div>',
+      fetchStub: () => Promise.resolve({ ok: false, status: 401, text: () => Promise.resolve('') }),
+      expect: {
+        platform: 'instagram',
+        username: 'salsaabl.f_',
+        displayName: 'Salsaabl F',
+        followerCount: 7400,
+        postSource: null,
+        status: 'OK',
+      },
+    },
+    {
+      name: 'instagram profile: login wall is reported, not silently empty',
+      script: 'ig',
+      meta: 'Login · See photos and videos from friends on Instagram',
+      html: '<div>Sign up to see photos and videos from your friends.</div>',
+      fetchStub: () => Promise.resolve({ ok: false, status: 401, text: () => Promise.resolve('') }),
+      expect: {
+        platform: 'instagram',
+        status: 'FAILED',
+        postSource: null,
+      },
+    },
+  ];
+
+  const PROFILE_HANDLE = 'salsaabl.f_';
+
+  const listeners = { tk: window.__saListeners[0], ig: window.__saListeners[1] };
+
+  const scrape = (script) => new Promise((resolve) => {
+    const sendResponse = (result) => resolve(result || { status: 'NO_RESPONSE' });
+    try {
+      // The worker always names the handle it asked for; a file:// path cannot.
+      listeners[script]({ action: 'scrapeProfile', username: PROFILE_HANDLE }, {}, sendResponse);
+    } catch (error) {
+      resolve({ status: 'HARNESS_THROW', error: String(error && error.message) });
+    }
+    setTimeout(() => resolve({ status: 'NO_RESPONSE' }), 25000);
+  });
+
+  (async () => {
+    const failures = [];
+    for (const testCase of CASES) {
+      document.body.innerHTML = testCase.html;
+      let meta = document.querySelector('meta[name="description"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'description';
+        document.head.appendChild(meta);
+      }
+      meta.content = testCase.meta || '';
+      window.__saFetch = testCase.fetchStub || null;
+
+      const result = await scrape(testCase.script);
+      window.__saFetch = null;
+
+      for (const [field, expected] of Object.entries(testCase.expect)) {
+        const actual = result ? result[field] : undefined;
+        if (actual !== expected) {
+          failures.push(`${testCase.name} :: ${field} = ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)} (status=${result && result.status})`);
+        }
+      }
+      if (testCase.check) {
+        for (const detail of testCase.check(result || {})) {
+          failures.push(`${testCase.name} :: ${detail}`);
+        }
+      }
+    }
+
+    const verdict = document.createElement('pre');
+    verdict.id = 'verdict';
+    verdict.textContent = failures.length === 0
+      ? `ALL FIXTURES PASS (${CASES.length})`
+      : `FIXTURE FAILURES ${failures.length}\n${failures.join('\n')}`;
+    document.body.appendChild(verdict);
+  })();
+</script>
+</body>
+</html>

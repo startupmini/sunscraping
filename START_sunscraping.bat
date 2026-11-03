@@ -12,6 +12,8 @@ echo.
 cd /d "%~dp0"
 cd backend
 
+set "PYTHONIOENCODING=utf-8"
+
 echo   [*] Checking dependencies...
 python -c "import flask, flask_cors, pandas, openpyxl" >nul 2>&1
 if errorlevel 1 (

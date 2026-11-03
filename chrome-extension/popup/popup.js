@@ -156,9 +156,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setRateDisplay() {
     const rate = state.rate;
-    modeValue.textContent = rate && rate.modeLabel ? rate.modeLabel : 'Mode aman';
-    quotaValue.textContent = rate && Number.isFinite(rate.dailyRemaining) && Number.isFinite(rate.dailyLimit)
-      ? rate.dailyRemaining + ' / ' + rate.dailyLimit
+    const pace = rate && rate.paceLabel ? ' · ' + rate.paceLabel : '';
+    modeValue.textContent = (rate && rate.modeLabel ? rate.modeLabel : 'Mode aman') + pace;
+    quotaValue.textContent = rate && Number.isFinite(rate.cycleRemaining) && Number.isFinite(rate.visitBudget)
+      ? 'siklus ' + rate.cycleRemaining + ' / ' + rate.visitBudget
       : '—';
     queueValue.textContent = Number.isFinite(state.queue) ? state.queue : '—';
   }

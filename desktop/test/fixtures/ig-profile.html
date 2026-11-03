@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <title>instagram profile fixture</title>
+  <meta name="description" content="7.400 Followers, 12 Following, 214 Postingan - Demo Akun on Instagram">
+</head>
+<body>
+  <header><a href="/demo.akun/">demo.akun</a></header>
+
+  <!-- Shaped like web_profile_info, which is what the scraper scans for. The
+       timeline carries epoch seconds under taken_at, as the real payload does. -->
+  <script type="application/json" id="profile-data">
+  {"data":{"user":{
+    "pk":"4400112233",
+    "username":"demo.akun",
+    "full_name":"Demo Akun",
+    "biography":"Endorse: WA 0812-3456-7890",
+    "is_verified":false,
+    "edge_followed_by":{"count":7400},
+    "edge_follow":{"count":12},
+    "edge_owner_to_timeline_media":{"count":214,"edges":[
+      {"node":{
+        "code":"CODE0","is_video":true,"taken_at":1730000000,
+        "edge_liked_by":{"count":200},
+        "edge_media_to_comment":{"count":7},
+        "video_view_count":5000,
+        "edge_media_to_caption":{"edges":[{"node":{"text":"caption ke-0"}}]}
+      }},
+      {"node":{
+        "code":"CODE1","is_video":false,"taken_at":1730086400,
+        "edge_liked_by":{"count":201},
+        "edge_media_to_comment":{"count":7},
+        "edge_media_to_caption":{"edges":[{"node":{"text":"caption ke-1"}}]}
+      }}
+    ]}
+  }}}
+  </script>
+</body>
+</html>

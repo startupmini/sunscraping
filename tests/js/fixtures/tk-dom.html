@@ -1,0 +1,180 @@
+<!doctype html>
+<!--
+  DOM fixture for the TikTok content script. Run through headless Chrome by
+  tests/js/dom-tk-scraper.test.mjs; the verdict is printed into the dumped DOM.
+  Script order mirrors manifest.json: content/common.js before content/tk-scraper.js.
+-->
+<html>
+<head><meta charset="utf-8"><title>sunscraping tk dom fixtures</title></head>
+<body>
+<script src="../../../chrome-extension/content/common.js"></script>
+<script>
+  // Minimal chrome.* stub: the scraper only needs a listener registry here.
+  window.__saListeners = [];
+  window.chrome = {
+    runtime: {
+      lastError: null,
+      id: 'sunscraping-test',
+      onMessage: { addListener: (fn) => { window.__saListeners.push(fn); } },
+      sendMessage: () => Promise.resolve(),
+      getURL: (path) => path,
+    },
+  };
+
+  // Used by the last fixture: force the scraper to throw mid-run so the
+  // listener's error path is exercised instead of an abandoned message port.
+  window.__saThrowObserver = false;
+  const NativeMutationObserver = window.MutationObserver;
+  window.MutationObserver = function (callback) {
+    if (window.__saThrowObserver) throw new Error('MutationObserver unavailable');
+    return new NativeMutationObserver(callback);
+  };
+</script>
+<script src="../../../chrome-extension/content/tk-scraper.js"></script>
+<script>
+  const icon = (name) => `<svg data-e2e="${name}-icon" width="24" height="24"></svg>`;
+  const actionButton = (label, name, text, title) =>
+    `<div class="DivAction${label}Container"><div class="DivAction${label}">`
+    + `<button type="button" aria-label="${name.toLowerCase()}" class="RegencyButtonPrimary">`
+    + `${icon(name)}<strong${title ? ` title="${title}"` : ''}>${text}</strong></button></div></div>`;
+  const bar = (...buttons) => `<div class="DivActionIconsContainer">${buttons.join('')}</div>`;
+
+  const like = actionButton('Like', 'like', '18.2K', '18200');
+  const comment = actionButton('Comment', 'comment', '234', '234');
+  const bookmark = actionButton('Favorite', 'favorite', '9,999', '9999');
+  const share = actionButton('Share', 'share', '1,234', '1234');
+
+  const CASES = [
+    {
+      name: 'action bar in the usual order',
+      html: bar(like, comment, bookmark, share),
+      expect: { likes: 18200, comments: 234, shares: 1234 },
+    },
+    {
+      // The regression this task exists for: the old fallback read
+      // [0]=likes [1]=comments [3]=shares by position, so this layout produced
+      // numbers that were confidently wrong.
+      name: 'action bar reordered (share, comment, bookmark, like)',
+      html: bar(share, comment, bookmark, like),
+      expect: { likes: 18200, comments: 234, shares: 1234 },
+    },
+    {
+      name: 'bookmarks and duet buttons present without count labels',
+      html: bar(like, bookmark, comment, share)
+        + `<div class="DivActionDuetContainer"><button aria-label="duet"><svg data-e2e="duet-icon"></svg><strong>77</strong></button></div>`,
+      expect: { likes: 18200, comments: 234, shares: 1234 },
+    },
+    {
+      name: 'unlabelled counters yield null instead of a guess',
+      html: '<div class="DivActionIconsContainer">'
+        + '<button class="a"><svg></svg><strong>111</strong></button>'
+        + '<button class="b"><svg></svg><strong>222</strong></button>'
+        + '<button class="c"><svg></svg><strong>333</strong></button>'
+        + '<button class="d"><svg></svg><strong>444</strong></button></div>',
+      expect: { likes: null, comments: null, shares: null, views: null, status: 'FAILED' },
+    },
+    {
+      name: 'explicit data-e2e counters win and read the exact title',
+      html: bar(like, comment, share)
+        + '<span data-e2e="browse-video-views" title="90210">90.2K</span>',
+      expect: { likes: 18200, comments: 234, shares: 1234, views: 90210 },
+    },
+    {
+      name: 'profile header: Following listed before Followers',
+      html: bar(like)
+        + '<div class="UserHeaderInfoContainer">'
+        + '<div class="CountInfoWrapper"><strong title="123">123</strong><span class="FollowStatusCount">Following</span></div>'
+        + '<div class="CountInfoWrapper"><strong title="45600">45.6K</strong><span class="FollowStatusCount">Followers</span></div>'
+        + '</div>',
+      expect: { likes: 18200, followerCount: 45600 },
+    },
+    {
+      name: 'profile header: Followers listed before Following',
+      html: bar(like)
+        + '<div class="UserHeaderInfoContainer">'
+        + '<div class="CountInfoWrapper"><strong title="45600">45.6K</strong><span class="FollowStatusCount">Followers</span></div>'
+        + '<div class="CountInfoWrapper"><strong title="123">123</strong><span class="FollowStatusCount">Following</span></div>'
+        + '</div>',
+      expect: { likes: 18200, followerCount: 45600 },
+    },
+    {
+      // A throw inside the scraper used to leave the message port unanswered:
+      // background.js saw "message port closed" and lost the cause.
+      name: 'scraper error is sent back as an explicit failure',
+      html: '<div><button aria-label="like"><svg data-e2e="like-icon"></svg><strong>5</strong></button></div>',
+      throwObserver: true,
+      expect: { status: 'FAILED', errorCode: 'TRANSIENT', source: 'error' },
+      expectErrorPrefix: 'Content script error:',
+    },
+    {
+      name: 'rehydration JSON keeps the full upload timestamp',
+      html: '<div id="fixture-body"></div><script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application/json">'
+        + JSON.stringify({
+          __DEFAULT_SCOPE__: {
+            'webapp.video-detail': {
+              statusCode: 0,
+              itemInfo: {
+                itemStruct: {
+                  id: '7439516205638106414',
+                  desc: 'test caption',
+                  createTime: 1730000000,
+                  author: { uniqueId: 'tester' },
+                  stats: { diggCount: '12345', commentCount: '67', playCount: '890123', shareCount: '45' },
+                },
+              },
+            },
+          },
+        })
+        + '<\/script>',
+      expect: {
+        status: 'OK',
+        source: 'rehydration',
+        username: 'tester',
+        likes: 12345,
+        comments: 67,
+        views: 890123,
+        shares: 45,
+        postDate: new Date(1730000000 * 1000).toISOString(),
+      },
+    },
+  ];
+
+  const scrape = () => new Promise((resolve) => {
+    const sendResponse = (result) => resolve(result || { status: 'NO_RESPONSE' });
+    // The listener returns true (async); if it throws, no response ever arrives.
+    try {
+      window.__saListeners[0]({ action: 'scrapePost', linkObj: { url: location.href, username: 'tester' } }, {}, sendResponse);
+    } catch (error) {
+      resolve({ status: 'HARNESS_THROW', error: String(error && error.message) });
+    }
+    setTimeout(() => resolve({ status: 'NO_RESPONSE' }), 20000);
+  });
+
+  (async () => {
+    const failures = [];
+    for (const testCase of CASES) {
+      document.body.innerHTML = testCase.html;
+      window.__saThrowObserver = !!testCase.throwObserver;
+      const result = await scrape();
+      window.__saThrowObserver = false;
+      for (const [field, expected] of Object.entries(testCase.expect)) {
+        const actual = result ? result[field] : undefined;
+        if (actual !== expected) {
+          failures.push(`${testCase.name} :: ${field} = ${JSON.stringify(actual)}, expected ${JSON.stringify(expected)} (status=${result && result.status})`);
+        }
+      }
+      if (testCase.expectErrorPrefix
+        && !String((result && result.error) || '').startsWith(testCase.expectErrorPrefix)) {
+        failures.push(`${testCase.name} :: error = ${JSON.stringify(result && result.error)}, expected prefix ${testCase.expectErrorPrefix}`);
+      }
+    }
+    const verdict = document.createElement('pre');
+    verdict.id = 'verdict';
+    verdict.textContent = failures.length === 0
+      ? `ALL FIXTURES PASS (${CASES.length})`
+      : `FIXTURE FAILURES ${failures.length}\n${failures.join('\n')}`;
+    document.body.appendChild(verdict);
+  })();
+</script>
+</body>
+</html>
