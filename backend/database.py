@@ -2237,6 +2237,22 @@ def _pair_off(keys, reason, links):
             links.setdefault(second, {}).setdefault(first, set()).add(reason)
 
 
+def shared_caption_templates(posts_by_account):
+    """Template keys repeated across more than one account.
+
+    The same template on two handles is the coordination signal we surface in
+    the account detail by marking those caption cells. A template that only one
+    account uses is just that account's voice, so it never counts.
+    """
+    by_template = {}
+    for key, posts in posts_by_account.items():
+        for post in posts:
+            template = caption_template_key(post.get('caption'))
+            if template:
+                by_template.setdefault(template, set()).add(key)
+    return {template for template, keys in by_template.items() if len(keys) >= 2}
+
+
 def find_account_links(accounts, posts_by_account):
     """Cross-account evidence as {account_key: {peer_key: {reasons}}}."""
     links = {}
@@ -2558,6 +2574,7 @@ def _intel_snapshot():
 
     links = find_account_links(accounts, posts_by_account)
     clusters = build_clusters(links)
+    shared_templates = shared_caption_templates(posts_by_account)
 
     items = []
     for account in accounts:
@@ -2577,7 +2594,8 @@ def _intel_snapshot():
             },
         ))
 
-    return {'items': items, 'links': links, 'clusters': clusters}
+    return {'items': items, 'links': links, 'clusters': clusters,
+            'shared_templates': shared_templates}
 
 
 def get_account_intel(platform=None, query=None, band=None, level=None,
@@ -2685,6 +2703,11 @@ def get_account_detail(username, platform=None):
             'ORDER BY month ASC', (match['platform'], username))]
     finally:
         conn.close()
+
+    shared_templates = snapshot.get('shared_templates') or set()
+    for post in posts:
+        post['caption_templated'] = bool(
+            post.get('caption') and caption_template_key(post.get('caption')) in shared_templates)
 
     siblings = []
     for peer in match['peers']:

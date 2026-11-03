@@ -25,7 +25,7 @@
 
     <div class="sidebar-search">
       <label class="sr-only" for="globalSearch">Cari data</label>
-      <input id="globalSearch" class="control" type="search" placeholder="Cari data…  /" autocomplete="off">
+      <input id="globalSearch" class="control" type="search" placeholder="Cari data… (tekan /)" autocomplete="off">
     </div>
 
     <nav class="nav" aria-label="Menu utama">
@@ -113,27 +113,17 @@
           <ul class="risk-list" id="summaryRiskList"></ul>
         </section>
 
-        <section class="recap-card is-section">
+        <!-- Platform Duel Cards & Breakdown -->
+        <section class="recap-card is-section" id="summaryPlatformSection">
           <div class="quality-head">
-            <h3 class="recap-title">Kelengkapan data <span class="recap-count">per akun</span></h3>
-            <div class="quality-actions">
-              <button type="button" id="qualityInfoBtn" class="info-btn" aria-expanded="false" aria-controls="qualityInfo" aria-label="Penjelasan kelengkapan data">i</button>
+            <h3 class="recap-title">Performa Per Platform <span class="recap-count">Instagram vs TikTok</span></h3>
+            <div class="platform-view-toggle">
+              <button type="button" class="btn btn-ghost btn-xs is-active" id="platformCardsToggle">Kartu</button>
+              <button type="button" class="btn btn-ghost btn-xs" id="platformTableToggle">Tabel</button>
             </div>
           </div>
-          <ul class="quality-list" id="summaryQuality"></ul>
-          <div id="qualityInfo" class="popover" hidden>
-            <p><strong>Tanpa followers</strong> — akun yang followers-nya belum pernah terukur; ER Instagram butuh angka ini.</p>
-            <p><strong>Sebagian terbaca</strong> — setidaknya satu unggahan akun hanya terbaca sebagian.</p>
-            <p><strong>TikTok tanpa views</strong> — views akun TikTok belum terbaca. Instagram tidak menampilkan views, jadi tidak dihitung.</p>
-            <p><strong>Tanpa handle</strong> — tautan tidak memuat handle, jadi ditampilkan sebagai URL.</p>
-            <p><strong>Belum diproses</strong> — belum ada satu pun snapshot untuk akun itu.</p>
-            <p><strong>Rumus ER</strong> — Instagram: (likes + komentar) ÷ followers; TikTok: (likes + komentar + share) ÷ views. Dipakai median, bukan rata-rata.</p>
-          </div>
-        </section>
-
-        <section class="recap-card is-section">
-          <h3 class="recap-title">Per platform</h3>
-          <div class="table-wrap">
+          <div class="platform-duel-grid" id="summaryPlatformCards"></div>
+          <div class="table-wrap" id="summaryPlatformTableWrap" hidden>
             <table>
               <caption class="sr-only">Rekapitulasi metrik per platform</caption>
               <thead>
@@ -153,49 +143,80 @@
           </div>
         </section>
 
-        <div class="recap-grid">
-          <section class="recap-card is-section" id="summaryTopViewsCard">
-            <div class="quality-head">
-              <h3 class="recap-title">Post teratas · views</h3>
-              <button type="button" id="topViewsAll" class="btn btn-ghost btn-sm">Lihat semua</button>
+        <!-- Spotlight Leaderboard -->
+        <section class="recap-card is-section" id="summarySpotlightSection">
+          <div class="quality-head">
+            <div class="spotlight-header-left">
+              <h3 class="recap-title">Spotlight Konten & Influencer</h3>
+              <div class="spotlight-tabs" role="tablist" aria-label="Kategori Spotlight">
+                <button type="button" class="spotlight-tab is-active" id="spotlightTabViews" role="tab" aria-selected="true">🔥 Top Views</button>
+                <button type="button" class="spotlight-tab" id="spotlightTabEr" role="tab" aria-selected="false">⚡ Top ER</button>
+                <button type="button" class="spotlight-tab" id="spotlightTabAccounts" role="tab" aria-selected="false">👑 Top Akun</button>
+              </div>
             </div>
-            <div class="table-wrap">
-              <table>
-                <caption class="sr-only">Postingan dengan views tertinggi</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Akun</th>
-                    <th scope="col" class="num">Views</th>
-                    <th scope="col" class="num">Likes</th>
-                    <th scope="col" class="num">ER</th>
-                  </tr>
-                </thead>
-                <tbody id="summaryTopViewsBody"></tbody>
-              </table>
+            <div class="spotlight-header-actions">
+              <button type="button" id="topViewsAll" class="btn btn-ghost btn-sm">Lihat semua di Target</button>
+              <button type="button" id="topErAll" class="btn btn-ghost btn-sm" hidden>Lihat ER di Target</button>
             </div>
-          </section>
+          </div>
+          <div class="spotlight-body" id="summarySpotlightList"></div>
 
-          <section class="recap-card is-section" id="summaryTopErCard">
-            <div class="quality-head">
-              <h3 class="recap-title">Post teratas · ER</h3>
-              <button type="button" id="topErAll" class="btn btn-ghost btn-sm">Lihat semua</button>
+          <!-- Fallback table view (preserved for contract compatibility) -->
+          <div class="recap-grid" id="summaryLeaderboardsFallback" hidden>
+            <section class="recap-card is-section" id="summaryTopViewsCard">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Akun</th>
+                      <th scope="col" class="num">Views</th>
+                      <th scope="col" class="num">Likes</th>
+                      <th scope="col" class="num">ER</th>
+                    </tr>
+                  </thead>
+                  <tbody id="summaryTopViewsBody"></tbody>
+                </table>
+              </div>
+            </section>
+            <section class="recap-card is-section" id="summaryTopErCard">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th scope="col">Akun</th>
+                      <th scope="col" class="num">ER</th>
+                      <th scope="col" class="num">Views</th>
+                      <th scope="col" class="num">Likes</th>
+                    </tr>
+                  </thead>
+                  <tbody id="summaryTopErBody"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- Diagnostik Kualitas Data -->
+        <section class="recap-card is-section" id="summaryQualitySection">
+          <div class="quality-head">
+            <div class="quality-title-wrap">
+              <h3 class="recap-title">Diagnostik Kualitas Data</h3>
+              <span class="health-badge" id="summaryHealthBadge">100% Siap Lapor</span>
             </div>
-            <div class="table-wrap">
-              <table>
-                <caption class="sr-only">Postingan dengan engagement rate tertinggi</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Akun</th>
-                    <th scope="col" class="num">ER</th>
-                    <th scope="col" class="num">Views</th>
-                    <th scope="col" class="num">Likes</th>
-                  </tr>
-                </thead>
-                <tbody id="summaryTopErBody"></tbody>
-              </table>
+            <div class="quality-actions">
+              <button type="button" id="qualityInfoBtn" class="info-btn" aria-expanded="false" aria-controls="qualityInfo" aria-label="Penjelasan kelengkapan data">i</button>
             </div>
-          </section>
-        </div>
+          </div>
+          <ul class="quality-list" id="summaryQuality"></ul>
+          <div id="qualityInfo" class="popover" hidden>
+            <p><strong>Tanpa followers</strong> — akun yang followers-nya belum pernah terukur; ER Instagram butuh angka ini.</p>
+            <p><strong>Sebagian terbaca</strong> — setidaknya satu unggahan akun hanya terbaca sebagian.</p>
+            <p><strong>TikTok tanpa views</strong> — views akun TikTok belum terbaca. Instagram tidak menampilkan views, jadi tidak dihitung.</p>
+            <p><strong>Tanpa handle</strong> — tautan tidak memuat handle, jadi ditampilkan sebagai URL.</p>
+            <p><strong>Belum diproses</strong> — belum ada satu pun snapshot untuk akun itu.</p>
+            <p><strong>Rumus ER</strong> — Instagram: (likes + komentar) ÷ followers; TikTok: (likes + komentar + share) ÷ views. Dipakai median, bukan rata-rata.</p>
+          </div>
+        </section>
 
         <section class="recap-card is-section" id="summaryTemaCard" hidden>
           <h3 class="recap-title">Rekap tema</h3>
@@ -240,6 +261,11 @@
         <details class="recap-card is-section summary-compare" id="pageCompare" open>
           <summary class="recap-title">Perbandingan bulanan</summary>
           <div class="compare-controls">
+              <div class="compare-quick-pills" role="group" aria-label="Pilih rentang bulan">
+                <button type="button" class="btn btn-ghost btn-xs" id="compareBtn3">3 bln</button>
+                <button type="button" class="btn btn-ghost btn-xs is-active" id="compareBtn6">6 bln</button>
+                <button type="button" class="btn btn-ghost btn-xs" id="compareBtn12">12 bln</button>
+              </div>
               <label class="sr-only" for="compareMonths">Jumlah bulan</label>
               <select id="compareMonths" class="control control-sm">
                 <option value="3">3 bulan</option>
@@ -865,7 +891,7 @@
   </div>
 </div>
 
-<div id="historyModal" class="modal" hidden>
+<div id="historyModal" class="modal is-drawer" hidden>
   <div class="modal-card is-table" role="dialog" aria-modal="true" aria-labelledby="historyTitle" aria-describedby="historySub">
     <div class="modal-header">
       <div>
@@ -900,7 +926,7 @@
   </div>
 </div>
 
-<div id="accountModal" class="modal" hidden>
+<div id="accountModal" class="modal is-drawer" hidden>
   <div class="modal-card is-table" role="dialog" aria-modal="true" aria-labelledby="accountTitle" aria-describedby="accountSub">
     <div class="modal-header">
       <div>

@@ -209,6 +209,21 @@ class TwinLinkTest(unittest.TestCase):
         }
         self.assertIn('template', self.link(rows, by_account)['tiktok:a']['tiktok:b'])
 
+    def test_shared_caption_templates_marks_a_multi_account_template(self):
+        shared = database.shared_caption_templates({
+            'tiktok:a': [post(0, caption='order via wa ya kak, murah banget no 08111')],
+            'tiktok:b': [post(0, caption='order via wa ya kak, murah banget no 08222')],
+        })
+        self.assertIn(
+            database.caption_template_key('order via wa ya kak, murah banget no 08111'),
+            shared)
+
+    def test_a_caption_used_by_one_account_is_never_shared(self):
+        shared = database.shared_caption_templates({
+            'tiktok:a': [post(0, caption='kata-kata asli cuma akun ini yang pakai, panjang sekali')],
+        })
+        self.assertEqual(shared, set())
+
     def test_two_accounts_uploading_at_the_same_minutes_link_weakly(self):
         rows = [account('a'), account('b')]
         by_account = {

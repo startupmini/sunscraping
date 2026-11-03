@@ -1,29 +1,29 @@
 :root {
-  /* Token warna disinkronkan dengan backend/static/dashboard.css */
-  --text: #101828;
-  --muted: #475467;
-  --faint: #667085;
-  --bg: #f4f7fb;
+  /* Token warna disinkronkan dengan backend/static/dashboard.css (Sun Amber & Slate) */
+  --text: #0f172a;
+  --muted: #475569;
+  --faint: #64748b;
+  --bg: #f8fafc;
   --surface: #ffffff;
-  --surface-soft: #f8f9fb;
-  --surface-tint: #f4f8ff;
-  --line: #e4e7ec;
-  --line-soft: #f0f2f5;
-  --line-strong: #d0d5dd;
-  --brand: #2563eb;
-  --brand-dark: #1d4ed8;
-  --brand-soft: #eef2ff;
-  --success: #067647;
-  --success-soft: #ecfdf3;
-  --warning: #b54708;
-  --warning-soft: #fffaeb;
-  --danger: #b42318;
-  --danger-soft: #fef3f2;
+  --surface-soft: #f1f5f9;
+  --surface-tint: #fffbeb;
+  --line: #e2e8f0;
+  --line-soft: #f1f5f9;
+  --line-strong: #cbd5e1;
+  --brand: #d97706;
+  --brand-dark: #b45309;
+  --brand-soft: #fef3c7;
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 9px;
-  --shadow-panel: 0 1px 2px rgba(16, 24, 40, .04), 0 18px 42px -32px rgba(16, 24, 40, .28);
-  --shadow-dialog: 0 24px 70px rgba(16, 24, 40, .24);
+  --shadow-panel: 0 1px 2px rgba(15, 23, 42, .04), 0 18px 42px -32px rgba(15, 23, 42, .18);
+  --shadow-dialog: 0 24px 70px rgba(15, 23, 42, .24);
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "Cascadia Code", Consolas, "Liberation Mono", monospace;
 }
@@ -41,8 +41,8 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   background:
-    radial-gradient(900px 460px at 92% -8%, #e8f0ff 0, rgba(232, 240, 255, 0) 64%),
-    radial-gradient(680px 420px at -10% 18%, #eef6ff 0, rgba(238, 246, 255, 0) 60%),
+    radial-gradient(900px 460px at 92% -8%, #fef3c7 0, rgba(254, 243, 199, 0) 64%),
+    radial-gradient(680px 420px at -10% 18%, #fffbeb 0, rgba(255, 251, 235, 0) 60%),
     var(--bg);
 }
 
