@@ -316,6 +316,9 @@
     navSummary: 'dashboard', navActivity: 'process', navData: 'table',
     navSettings: 'settings'
   };
+  var TAB_ICONS = {
+    tabTargets: 'table', tabAccounts: 'people', tabSearch: 'search'
+  };
   var BUTTON_ICONS = {
     openImportBtn: 'upload', openExportBtn: 'download', templateBtn: 'file',
     openDatabaseBtn: 'database', dbDownloadBtn: 'download', dbRestoreBtn: 'refresh',
@@ -332,6 +335,13 @@
       var button = document.getElementById(id);
       if (!button || button.querySelector('.icon')) return;
       var svg = svgIcon(NAV_ICONS[id]);
+      if (svg) button.insertBefore(svg, button.firstChild);
+    });
+
+    Object.keys(TAB_ICONS).forEach(function (id) {
+      var button = document.getElementById(id);
+      if (!button || button.querySelector('.icon')) return;
+      var svg = svgIcon(TAB_ICONS[id]);
       if (svg) button.insertBefore(svg, button.firstChild);
     });
 

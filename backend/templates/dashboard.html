@@ -14,8 +14,11 @@
 <div class="shell">
   <aside class="sidebar">
     <div class="sidebar-brand">
-      <span class="brand-mark" aria-hidden="true"><svg viewBox="6 6 36 36" focusable="false"><path fill="#FF9800" d="M11 11H37V37H11z"/><path fill="#FF9800" d="M11.272 11.272H36.728V36.728H11.272z" transform="rotate(-45.001 24 24)"/><path fill="#FFEB3B" d="M13,24c0,6.077,4.923,11,11,11c6.076,0,11-4.923,11-11s-4.924-11-11-11C17.923,13,13,17.923,13,24"/></svg></span>
-      <h1 class="brand-name">sun<span class="brand-tail">scraping</span></h1>
+      <div class="sidebar-brand-inner">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="6 6 36 36" focusable="false"><path fill="#FF9800" d="M11 11H37V37H11z"/><path fill="#FF9800" d="M11.272 11.272H36.728V36.728H11.272z" transform="rotate(-45.001 24 24)"/><path fill="#FFEB3B" d="M13,24c0,6.077,4.923,11,11,11c6.076,0,11-4.923,11-11s-4.924-11-11-11C17.923,13,13,17.923,13,24"/></svg></span>
+        <h1 class="brand-name">sun<span class="brand-tail">scraping</span></h1>
+      </div>
+      <span class="brand-badge">OPS</span>
     </div>
 
     <div class="sidebar-audit" id="sidebarAudit">
@@ -43,15 +46,17 @@
     </div>
 
     <div class="status-strip" aria-label="Status sistem">
-      <span class="status-kicker">Status</span>
-      <span id="workerPill" class="pill is-idle" title="Status worker">
-        <span class="pill-dot"></span>
-        <span id="workerPillText">Worker siaga</span>
-      </span>
-      <span id="streamPill" class="pill" title="Status koneksi dashboard">
-        <span class="pill-dot"></span>
-        <span id="streamPillText">Menghubungkan…</span>
-      </span>
+      <div class="status-left">
+        <span class="status-kicker">Status</span>
+        <span id="workerPill" class="pill is-idle" title="Status worker">
+          <span class="pill-dot"></span>
+          <span id="workerPillText">Worker siaga</span>
+        </span>
+        <span id="streamPill" class="pill" title="Status koneksi dashboard">
+          <span class="pill-dot"></span>
+          <span id="streamPillText">Menghubungkan…</span>
+        </span>
+      </div>
     </div>
 
     <div id="dataToolbar" class="page-toolbar" hidden>
