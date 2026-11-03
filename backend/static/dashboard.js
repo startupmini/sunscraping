@@ -496,6 +496,18 @@
     return date.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
   }
 
+  function formatDateOnly(value) {
+    var date = parseServerTime(value);
+    if (!date) return '—';
+    return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function formatTimeOnly(value) {
+    var date = parseServerTime(value);
+    if (!date) return '—';
+    return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+  }
+
   function calcEr(platform, likes, comments, views, shares, followers) {
     var l = Number(likes) || 0;
     var c = Number(comments) || 0;
@@ -2518,16 +2530,38 @@
     accountTd.appendChild(sub);
     tr.appendChild(accountTd);
 
-    var postTd = make('td', 'data-cell col-upload');
-    postTd.appendChild(make('span', 'metric-value',
-      item.post_date ? formatDateTime(item.post_date) : '—'));
+    var dateTd = make('td', 'data-cell col-upload');
+    var dateVal = formatDateOnly(item.post_date);
+    var dateNode = make('span', 'metric-value', dateVal);
+    if (item.post_date) {
+      dateNode.title = formatDateTime(item.post_date);
+    }
+    dateTd.appendChild(dateNode);
+    tr.appendChild(dateTd);
+
+    var timeTd = make('td', 'data-cell col-time');
+    var timeVal = formatTimeOnly(item.post_date);
+    if (timeVal !== '—') {
+      var timeNode = make('span', 'time-pill', timeVal);
+      if (item.post_date) {
+        timeNode.title = formatDateTime(item.post_date);
+      }
+      timeTd.appendChild(timeNode);
+    } else {
+      timeTd.appendChild(make('span', 'metric-value text-muted', '—'));
+    }
+    tr.appendChild(timeTd);
+
+    var postTd = make('td', 'col-post');
     if (item.url) {
-      var postLink = make('a', 'recap-link post-open-link', 'Post ↗');
-      postLink.href = item.url;
-      postLink.target = '_blank';
-      postLink.rel = 'noopener noreferrer';
-      postLink.title = 'Buka postingan asli di tab baru';
-      postTd.appendChild(postLink);
+      var postBtn = make('a', 'post-col-btn', 'Post ↗');
+      postBtn.href = item.url;
+      postBtn.target = '_blank';
+      postBtn.rel = 'noopener noreferrer';
+      postBtn.title = 'Buka postingan asli di tab baru';
+      postTd.appendChild(postBtn);
+    } else {
+      postTd.appendChild(make('span', 'metric-value text-muted', '—'));
     }
     tr.appendChild(postTd);
 

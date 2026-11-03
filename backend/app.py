@@ -92,7 +92,7 @@ MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # single ceiling for both the 413 handler a
 # A spreadsheet is a zip: MAX_CONTENT_LENGTH bounds the archive, not the XML it
 # unpacks into memory, so the unpacked size gets its own ceiling.
 MAX_UNCOMPRESSED_XLSX_BYTES = 200 * 1024 * 1024
-ASSET_VERSION = '42'  # bump whenever dashboard.css/dashboard.js changes, so browsers drop the cache
+ASSET_VERSION = '43'  # bump whenever dashboard.css/dashboard.js changes, so browsers drop the cache
 
 app.config.update(
     SECRET_KEY=_load_or_create_file(SECRET_FILE, lambda: secrets.token_hex(32)),
