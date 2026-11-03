@@ -674,6 +674,19 @@
     } else if (
       result.views === null
       && isVideoContent
+      && result.likes !== null
+      && result.comments !== null
+    ) {
+      // Instagram engagement rate is (likes + comments) / followers, so views
+      // is never part of the IG formula. Carousel/reel slides (e.g.
+      // /p/CODE/?img_index=N) routinely hide the play count, so a video with
+      // full engagement but no exposed view count is a complete row, not a
+      // partial one.
+      result.error = null;
+      result.viewsMissingReason = 'video/reel without an exposed view count';
+    } else if (
+      result.views === null
+      && isVideoContent
       && (result.likes !== null || result.comments !== null)
     ) {
       result.status = 'PARTIAL';
