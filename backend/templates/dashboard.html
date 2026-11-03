@@ -258,30 +258,41 @@
 
         <p class="recap-footnote" id="summaryFootnote"></p>
 
-        <details class="recap-card is-section summary-compare" id="pageCompare" open>
-          <summary class="recap-title">Perbandingan bulanan</summary>
-          <div class="compare-controls">
+        <section class="recap-card is-section summary-compare" id="pageCompare">
+          <div class="quality-head compare-header">
+            <div class="compare-title-wrap">
+              <h3 class="recap-title">Perbandingan Bulanan</h3>
+              <span class="recap-count" id="compareSummaryCount">Tren performa akun</span>
+            </div>
+            <div class="compare-controls">
               <div class="compare-quick-pills" role="group" aria-label="Pilih rentang bulan">
-                <button type="button" class="btn btn-ghost btn-xs" id="compareBtn3">3 bln</button>
-                <button type="button" class="btn btn-ghost btn-xs is-active" id="compareBtn6">6 bln</button>
-                <button type="button" class="btn btn-ghost btn-xs" id="compareBtn12">12 bln</button>
+                <button type="button" class="compare-pill-btn" id="compareBtn3">3 Bulan</button>
+                <button type="button" class="compare-pill-btn is-active" id="compareBtn6">6 Bulan</button>
+                <button type="button" class="compare-pill-btn" id="compareBtn12">12 Bulan</button>
               </div>
               <label class="sr-only" for="compareMonths">Jumlah bulan</label>
-              <select id="compareMonths" class="control control-sm">
+              <select id="compareMonths" class="sr-only">
                 <option value="3">3 bulan</option>
                 <option value="6" selected>6 bulan</option>
                 <option value="12">12 bulan</option>
               </select>
               <button type="button" id="compareInfoBtn" class="info-btn" aria-expanded="false" aria-controls="compareInfo" aria-label="Penjelasan perbandingan">i</button>
             </div>
-
-          <p id="compareSummary" class="panel-note" hidden></p>
-
-          <div id="compareInfo" class="popover" hidden>
-            <p>Angka tiap bulan memakai snapshot terakhir dari setiap tautan di bulan itu. Sel kosong berarti tidak ada tautan dari akun tersebut pada bulan tersebut — bukan berarti angkanya nol.</p>
           </div>
 
-          <div id="compareBars" class="compare-bars" aria-hidden="true" hidden></div>
+          <div id="compareInfo" class="popover compare-popover" hidden>
+            <p><strong>Perbandingan Bulanan</strong> — Angka tiap bulan memakai snapshot terakhir dari setiap tautan di bulan itu. Sel kosong berarti tidak ada tautan dari akun tersebut pada bulan tersebut — bukan berarti angkanya nol.</p>
+          </div>
+
+          <div class="compare-highlight-strip" id="compareSummary"></div>
+
+          <div class="compare-bars-wrapper" id="compareBarsWrap">
+            <div class="compare-bars-head">
+              <span class="compare-bars-title">Agregat Total Views per Bulan</span>
+              <span class="compare-bars-hint">Tren jangkauan seluruh akun</span>
+            </div>
+            <div id="compareBars" class="compare-bars" aria-hidden="true" hidden></div>
+          </div>
 
           <div class="table-wrap compare-wrap" role="region" aria-label="Tabel perbandingan bulanan" tabindex="0">
             <table class="compare-table">
@@ -294,8 +305,7 @@
           <div class="compare-foot">
             <button type="button" id="compareMore" class="btn btn-ghost btn-sm" hidden>Tampilkan semua akun</button>
           </div>
-
-        </details>
+        </section>
       </div>
       </div>
     </section>

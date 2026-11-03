@@ -1934,22 +1934,26 @@
     visibleAccounts.forEach(function (account) {
       var tr = make('tr');
       var accountTd = make('td', 'account-cell');
-      var line = make('span', 'account-line');
-      line.appendChild(platformDot(account.platform));
+      var line = make('div', 'compare-account-info');
+
+      var handleRow = make('div', 'compare-account-handle-row');
+      handleRow.appendChild(platformDot(account.platform));
       var handleLabel = account.username ? '@' + account.username : (account.handle || '—');
-      var handleNode = make('button', 'spotlight-handle', handleLabel);
+      var handleNode = make('button', 'compare-account-handle', handleLabel);
       handleNode.type = 'button';
-      handleNode.title = 'Buka detail profil akun';
+      handleNode.title = 'Buka slide drawer profil akun';
       handleNode.addEventListener('click', function () {
         openAccountDetail(account.platform + ':' + (account.username || account.handle));
       });
-      line.appendChild(handleNode);
-      accountTd.appendChild(line);
+      handleRow.appendChild(handleNode);
+      line.appendChild(handleRow);
+
       if (account.is_new) {
-        accountTd.appendChild(make('span', 'account-sub', 'baru bulan ini'));
+        line.appendChild(make('span', 'compare-badge is-new', '✨ Baru'));
       } else if (account.missing_latest) {
-        accountTd.appendChild(make('span', 'account-sub is-warn', 'tidak mengirim tautan bulan ini'));
+        line.appendChild(make('span', 'compare-badge is-absent', '⚠️ Absen bln ini'));
       }
+      accountTd.appendChild(line);
       tr.appendChild(accountTd);
 
       var prevViews = null;
@@ -1957,26 +1961,42 @@
         var cell = account.months[period];
         var td = make('td', 'compare-cell');
         if (!cell) {
-          td.appendChild(make('span', 'compare-missing', 'tidak ada kiriman'));
+          var emptyCard = make('div', 'compare-cell-empty');
+          emptyCard.appendChild(make('span', 'empty-dash', '—'));
+          emptyCard.title = 'Tidak ada unggahan pada bulan ini';
+          td.appendChild(emptyCard);
           prevViews = null;
         } else {
-          var viewsBox = make('div', 'compare-values');
-          viewsBox.appendChild(document.createTextNode(formatNumber(cell.views) + ' views'));
+          var card = make('div', 'compare-cell-card');
+
+          var top = make('div', 'compare-cell-top');
+          top.appendChild(make('span', 'compare-views-num', formatNumber(cell.views)));
+          top.appendChild(make('span', 'compare-views-unit', 'views'));
+
           if (prevViews !== null && prevViews > 0 && cell.views !== null && cell.views !== undefined) {
             var diff = Number(cell.views) - prevViews;
             var pct = Math.round(diff * 100 / prevViews);
             if (pct !== 0) {
               var deltaPill = make('span', 'delta-pill ' + (pct > 0 ? 'is-up' : 'is-down'),
                 (pct > 0 ? '↑ +' : '↓ ') + pct + '%');
-              viewsBox.appendChild(deltaPill);
+              deltaPill.title = (pct > 0 ? 'Naik ' : 'Turun ') + Math.abs(pct) + '% dibanding bulan sebelumnya';
+              top.appendChild(deltaPill);
             }
           }
           prevViews = Number(cell.views) || 0;
-          td.appendChild(viewsBox);
-          td.appendChild(make('span', 'compare-sub',
-            formatNumber(cell.posts) + ' post · ER ' + formatEr(cell.median_er)));
-          td.appendChild(make('span', 'compare-sub',
-            cell.followers ? formatNumber(cell.followers) + ' followers' : 'followers belum terukur'));
+          card.appendChild(top);
+
+          var meta = make('div', 'compare-cell-meta');
+          meta.appendChild(make('span', 'compare-tag', formatNumber(cell.posts) + ' post'));
+          if (cell.median_er !== null && cell.median_er !== undefined) {
+            meta.appendChild(make('span', 'compare-tag is-er', 'ER ' + formatEr(cell.median_er)));
+          }
+          card.appendChild(meta);
+
+          if (cell.followers) {
+            card.appendChild(make('div', 'compare-cell-followers', formatNumber(cell.followers) + ' flwr'));
+          }
+          td.appendChild(card);
         }
         tr.appendChild(td);
       });
@@ -2011,27 +2031,60 @@
       var maxTotal = totals.reduce(function (max, item) { return Math.max(max, item.views); }, 0);
       var showBars = totals.length >= 2 && maxTotal > 0;
       el.compareBars.hidden = !showBars;
+      var barsWrap = document.getElementById('compareBarsWrap');
+      if (barsWrap) barsWrap.hidden = !showBars;
       el.compareBars.replaceChildren();
       if (showBars) {
+        var prevBarViews = null;
         totals.forEach(function (item) {
           var row = make('div', 'compare-bar-row');
-          row.appendChild(make('span', null, monthLabel(item.period)));
+          row.appendChild(make('span', 'compare-bar-label', monthLabel(item.period)));
+
           var track = make('div', 'compare-bar-track');
           var fill = make('span', 'compare-bar-fill');
           fill.style.width = Math.max(2, Math.round(item.views * 100 / maxTotal)) + '%';
           track.appendChild(fill);
           row.appendChild(track);
-          row.appendChild(make('span', 'compare-bar-value', formatNumber(item.views) + ' views'));
+
+          var valBox = make('div', 'compare-bar-val-box');
+          valBox.appendChild(make('strong', 'compare-bar-value', formatNumber(item.views) + ' views'));
+          if (prevBarViews !== null && prevBarViews > 0 && item.views > 0) {
+            var diff = item.views - prevBarViews;
+            var pct = Math.round(diff * 100 / prevBarViews);
+            if (pct !== 0) {
+              valBox.appendChild(make('span', 'delta-pill ' + (pct > 0 ? 'is-up' : 'is-down'),
+                (pct > 0 ? '↑ +' : '↓ ') + pct + '%'));
+            }
+          }
+          prevBarViews = item.views;
+          row.appendChild(valBox);
+
           el.compareBars.appendChild(row);
         });
       }
     }
 
     el.compareSummary.hidden = false;
-    el.compareSummary.textContent =
-      formatNumber(data.summary.accounts) + ' akun · ' +
-      formatNumber(data.summary.new_accounts) + ' baru bulan ini · ' +
-      formatNumber(data.summary.missing_latest) + ' tidak mengirim tautan bulan ini';
+    el.compareSummary.replaceChildren();
+
+    var chipAccounts = make('div', 'compare-summary-chip');
+    chipAccounts.appendChild(make('span', 'chip-icon', '👥'));
+    chipAccounts.appendChild(make('span', 'chip-label', 'Akun Terpantau'));
+    chipAccounts.appendChild(make('strong', null, formatNumber(data.summary.accounts)));
+    el.compareSummary.appendChild(chipAccounts);
+
+    var chipNew = make('div', 'compare-summary-chip is-new');
+    chipNew.appendChild(make('span', 'chip-icon', '✨'));
+    chipNew.appendChild(make('span', 'chip-label', 'Baru Bulan Ini'));
+    chipNew.appendChild(make('strong', null, '+' + formatNumber(data.summary.new_accounts)));
+    el.compareSummary.appendChild(chipNew);
+
+    var missingCount = Number(data.summary.missing_latest) || 0;
+    var chipMissing = make('div', 'compare-summary-chip' + (missingCount ? ' is-warn' : ''));
+    chipMissing.appendChild(make('span', 'chip-icon', missingCount ? '⚠️' : '✓'));
+    chipMissing.appendChild(make('span', 'chip-label', missingCount ? 'Absen Bulan Ini' : 'Semua Aktif'));
+    chipMissing.appendChild(make('strong', null, formatNumber(missingCount)));
+    el.compareSummary.appendChild(chipMissing);
   }
 
   // ---------- Manual search ----------
