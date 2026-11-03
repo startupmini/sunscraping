@@ -34,6 +34,10 @@
     qaExport: document.getElementById('qaExport'),
     qualityInfoBtn: document.getElementById('qualityInfoBtn'),
     qualityInfo: document.getElementById('qualityInfo'),
+    qualityInfoClose: document.getElementById('qualityInfoClose'),
+    summaryPlatformSubtitle: document.getElementById('summaryPlatformSubtitle'),
+    summaryHealthGauge: document.getElementById('summaryHealthGauge'),
+    summaryHealthGaugeFill: document.getElementById('summaryHealthGaugeFill'),
     summaryRiskCard: document.getElementById('summaryRiskCard'),
     summaryRiskList: document.getElementById('summaryRiskList'),
     summaryRiskCount: document.getElementById('summaryRiskCount'),
@@ -1374,29 +1378,37 @@
     card1.appendChild(progBar);
 
     var chips = make('div', 'kpi-status-chips');
-    var chipOk = make('button', 'kpi-chip is-ok', '✓ Selesai ' + formatNumber(okCount));
+    var chipOk = make('button', 'kpi-chip is-ok');
     chipOk.type = 'button';
-    chipOk.title = 'Klik untuk memfilter target selesai';
+    chipOk.title = 'Filter target Selesai (OK) di halaman Target';
+    chipOk.appendChild(make('span', 'kpi-chip-dot'));
+    chipOk.appendChild(document.createTextNode('Selesai ' + formatNumber(okCount)));
     chipOk.addEventListener('click', function () { filterTargetsByStatus('OK'); });
     chips.appendChild(chipOk);
 
-    var chipPart = make('button', 'kpi-chip is-partial', '⚡ Sebagian ' + formatNumber(partCount));
+    var chipPart = make('button', 'kpi-chip is-partial');
     chipPart.type = 'button';
-    chipPart.title = 'Klik untuk memfilter target terbaca sebagian';
+    chipPart.title = 'Filter target Terbaca Sebagian (PARTIAL) di halaman Target';
+    chipPart.appendChild(make('span', 'kpi-chip-dot'));
+    chipPart.appendChild(document.createTextNode('Sebagian ' + formatNumber(partCount)));
     chipPart.addEventListener('click', function () { filterTargetsByStatus('PARTIAL'); });
     chips.appendChild(chipPart);
 
     if (failCount > 0) {
-      var chipFail = make('button', 'kpi-chip is-failed', '✗ Gagal ' + formatNumber(failCount));
+      var chipFail = make('button', 'kpi-chip is-failed');
       chipFail.type = 'button';
-      chipFail.title = 'Klik untuk memfilter target gagal';
+      chipFail.title = 'Filter target Gagal (FAILED) di halaman Target';
+      chipFail.appendChild(make('span', 'kpi-chip-dot'));
+      chipFail.appendChild(document.createTextNode('Gagal ' + formatNumber(failCount)));
       chipFail.addEventListener('click', function () { filterTargetsByStatus('FAILED'); });
       chips.appendChild(chipFail);
     }
 
-    var chipPend = make('button', 'kpi-chip is-pending', '⏳ Antrean ' + formatNumber(remaining));
+    var chipPend = make('button', 'kpi-chip is-pending');
     chipPend.type = 'button';
-    chipPend.title = 'Klik untuk melihat antrean aktivitas';
+    chipPend.title = remaining ? 'Buka antrean proses worker di halaman Aktivitas' : 'Semua antrean selesai diproses';
+    chipPend.appendChild(make('span', 'kpi-chip-dot'));
+    chipPend.appendChild(document.createTextNode(remaining ? 'Antrean ' + formatNumber(remaining) : 'Antrean bersih'));
     chipPend.addEventListener('click', function () { setPage('activity'); });
     chips.appendChild(chipPend);
     card1.appendChild(chips);
@@ -1445,28 +1457,34 @@
       shareLegend.appendChild(make('span', null, 'TikTok: ' + ttShare + '% (' + formatNumber(ttViews) + ')'));
       shareLegend.appendChild(make('span', null, 'Instagram: ' + igShare + '% (' + formatNumber(igViews) + ')'));
       card2.appendChild(shareLegend);
+
+      var shareNote = make('div', 'kpi-share-note', 'ℹ️ Views Instagram hanya mencakup Reels & Video.');
+      card2.appendChild(shareNote);
     }
 
     var subMatrix = make('div', 'kpi-sub-matrix');
-    function addSubItem(label, val, isBrand) {
+    function addSubItem(label, val, isBrand, tooltip) {
       var item = make('div', 'kpi-sub-item');
       item.appendChild(make('span', 'kpi-sub-label', label));
       var vNode = make('span', 'kpi-sub-val' + (isBrand ? ' is-brand' : ''), val);
+      if (tooltip) item.title = tooltip;
       item.appendChild(vNode);
       subMatrix.appendChild(item);
     }
     addSubItem('Likes', formatNumber(totals.likes || 0));
     addSubItem('Komentar', formatNumber(totals.comments || 0));
     addSubItem('Share', formatNumber(totals.shares || 0));
-    var bestErText = '—';
+
     if (ttEr !== null && igEr !== null) {
-      bestErText = formatEr(Math.max(ttEr, igEr));
+      addSubItem('Median ER', 'TT ' + formatEr(ttEr) + ' · IG ' + formatEr(igEr), true,
+        'TikTok berbasis views: (likes+komentar+share)/views. Instagram berbasis followers: (likes+komentar)/followers.');
     } else if (ttEr !== null) {
-      bestErText = formatEr(ttEr);
+      addSubItem('Median ER (TikTok)', formatEr(ttEr), true, 'TikTok: (likes+komentar+share) ÷ views');
     } else if (igEr !== null) {
-      bestErText = formatEr(igEr);
+      addSubItem('Median ER (IG)', formatEr(igEr), true, 'Instagram: (likes+komentar) ÷ followers');
+    } else {
+      addSubItem('Median ER', '—', true);
     }
-    addSubItem('Median ER', bestErText, true);
     card2.appendChild(subMatrix);
 
     el.summaryKpi.appendChild(card2);
@@ -1475,6 +1493,22 @@
   function renderPlatformDuel(platforms, minRows) {
     if (!el.summaryPlatformCards) return;
     el.summaryPlatformCards.replaceChildren();
+
+    if (el.summaryPlatformSubtitle) {
+      if (platforms.length === 1) {
+        el.summaryPlatformSubtitle.textContent = 'Platform Tunggal: ' + platformLabel(platforms[0].platform);
+      } else if (platforms.length > 1) {
+        el.summaryPlatformSubtitle.textContent = 'Instagram vs TikTok';
+      } else {
+        el.summaryPlatformSubtitle.textContent = '';
+      }
+    }
+
+    if (platforms.length === 1) {
+      el.summaryPlatformCards.classList.add('is-single');
+    } else {
+      el.summaryPlatformCards.classList.remove('is-single');
+    }
 
     if (!platforms.length) {
       var emptyNotice = make('div', 'recap-empty', 'Belum ada platform yang terbaca.');
@@ -1599,7 +1633,15 @@
         metricsBox.appendChild(make('span', 'spotlight-metric-val', formatNumber(item.views) + ' views'));
         metricsBox.appendChild(make('span', 'spotlight-metric-sub', formatNumber(item.likes) + ' likes · ER ' + formatEr(item.er)));
       } else if (currentSpotlightTab === 'er') {
-        metricsBox.appendChild(make('span', 'spotlight-metric-val', 'ER ' + formatEr(item.er)));
+        var erHead = make('span', 'spotlight-metric-val', 'ER ' + formatEr(item.er));
+        var isSmallSample = (item.platform === 'tiktok' && (Number(item.views) || 0) < 100) ||
+                            (item.platform === 'instagram' && (Number(item.likes) || 0) < 20);
+        if (isSmallSample) {
+          var tagWarn = make('span', 'spotlight-tag is-sample-warn', 'sampel kecil');
+          tagWarn.title = 'ER tinggi namun sampel metrik masih sedikit sehingga belum representatif.';
+          erHead.appendChild(tagWarn);
+        }
+        metricsBox.appendChild(erHead);
         metricsBox.appendChild(make('span', 'spotlight-metric-sub', formatNumber(item.views) + ' views · ' + formatNumber(item.likes) + ' likes'));
       } else {
         metricsBox.appendChild(make('span', 'spotlight-metric-val', formatNumber(item.views) + ' views'));
@@ -1668,6 +1710,12 @@
         el.summaryHealthBadge.className = 'health-badge is-warn';
         el.summaryHealthBadge.textContent = healthPct + '% Perlu Tinjauan';
       }
+    }
+
+    if (el.summaryHealthGaugeFill) {
+      el.summaryHealthGaugeFill.style.width = healthPct + '%';
+      el.summaryHealthGaugeFill.className = 'health-meter-fill ' +
+        (gaps === 0 ? 'is-perfect' : (healthPct >= 80 ? 'is-good' : 'is-warn'));
     }
 
     var qualityItems = [
@@ -1759,12 +1807,23 @@
     });
   }
 
+  if (el.qualityInfoClose) {
+    el.qualityInfoClose.addEventListener('click', function () {
+      if (el.qualityInfo) el.qualityInfo.hidden = true;
+      if (el.qualityInfoBtn) {
+        el.qualityInfoBtn.setAttribute('aria-expanded', 'false');
+        el.qualityInfoBtn.classList.remove('is-active');
+      }
+    });
+  }
+
   function showTopTargets(key) {
     setDataView('targets');
     targetState.sort = key;
     targetState.dir = 'desc';
     targetState.offset = 0;
     targetState.signature = '';
+    updateTargetSortHeaders();
     loadTargets(true);
   }
 

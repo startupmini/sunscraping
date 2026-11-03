@@ -111,9 +111,27 @@
       meta: '12 Likes',
       html: '<div id="reels"></div>',
       fetchStub: () => Promise.reject(new Error('403')),
-      // A reel with no view count is honestly PARTIAL; the point here is that no
-      // handle was invented from the display name.
+      // Likes but no comments AND no views is incomplete -> PARTIAL. The point
+      // here is also that no handle was invented from the display name.
       expect: { status: 'PARTIAL', username: null, likes: 12 },
+    },
+    {
+      name: 'reel with engagement but no view count stays complete',
+      title: 'Instagram',
+      og: '',
+      meta: '1,234 Likes, 56 Comments',
+      html: '<div id="reels"></div>',
+      fetchStub: () => Promise.reject(new Error('403')),
+      // Instagram ER is (likes + comments) / followers, so a video with full
+      // engagement but no exposed play count is OK, not PARTIAL.
+      expect: {
+        status: 'OK',
+        platform: 'instagram',
+        likes: 1234,
+        comments: 56,
+        views: null,
+        viewsMissingReason: 'video/reel without an exposed view count',
+      },
     },
     {
       name: 'classic post page: header link, <time> and h1 still work',

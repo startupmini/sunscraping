@@ -97,13 +97,16 @@
       </div>
 
       <div id="summaryBody" hidden>
-        <div class="kpi-grid" id="summaryKpi" role="group" aria-label="Angka utama audit"></div>
-
-        <div class="quick-actions" id="summaryActions">
-          <button type="button" class="qa" id="qaProcess">Lihat proses <span aria-hidden="true">→</span></button>
-          <button type="button" class="qa" id="qaAccounts">Data akun <span aria-hidden="true">→</span></button>
-          <button type="button" class="qa" id="qaExport">Unduh laporan <span aria-hidden="true">→</span></button>
+        <!-- Top Executive Utility Actions -->
+        <div class="summary-top-bar">
+          <div class="quick-actions" id="summaryActions">
+            <button type="button" class="qa" id="qaProcess">Lihat proses <span aria-hidden="true">→</span></button>
+            <button type="button" class="qa" id="qaAccounts">Data akun <span aria-hidden="true">→</span></button>
+            <button type="button" class="qa" id="qaExport">Unduh laporan <span aria-hidden="true">→</span></button>
+          </div>
         </div>
+
+        <div class="kpi-grid" id="summaryKpi" role="group" aria-label="Angka utama audit"></div>
 
         <section class="recap-card is-section" id="summaryRiskCard" hidden>
           <div class="quality-head">
@@ -116,7 +119,7 @@
         <!-- Platform Duel Cards & Breakdown -->
         <section class="recap-card is-section" id="summaryPlatformSection">
           <div class="quality-head">
-            <h3 class="recap-title">Performa Per Platform <span class="recap-count">Instagram vs TikTok</span></h3>
+            <h3 class="recap-title">Performa Per Platform <span class="recap-count" id="summaryPlatformSubtitle">Instagram vs TikTok</span></h3>
             <div class="platform-view-toggle">
               <button type="button" class="btn btn-ghost btn-xs is-active" id="platformCardsToggle">Kartu</button>
               <button type="button" class="btn btn-ghost btn-xs" id="platformTableToggle">Tabel</button>
@@ -201,7 +204,10 @@
           <div class="quality-head">
             <div class="quality-title-wrap">
               <h3 class="recap-title">Diagnostik Kualitas Data</h3>
-              <span class="health-badge" id="summaryHealthBadge">100% Siap Lapor</span>
+              <div class="health-indicator-wrap">
+                <span class="health-meter" id="summaryHealthGauge" aria-hidden="true"><span class="health-meter-fill" id="summaryHealthGaugeFill"></span></span>
+                <span class="health-badge" id="summaryHealthBadge">100% Siap Lapor</span>
+              </div>
             </div>
             <div class="quality-actions">
               <button type="button" id="qualityInfoBtn" class="info-btn" aria-expanded="false" aria-controls="qualityInfo" aria-label="Penjelasan kelengkapan data">i</button>
@@ -209,12 +215,18 @@
           </div>
           <ul class="quality-list" id="summaryQuality"></ul>
           <div id="qualityInfo" class="popover" hidden>
-            <p><strong>Tanpa followers</strong> — akun yang followers-nya belum pernah terukur; ER Instagram butuh angka ini.</p>
-            <p><strong>Sebagian terbaca</strong> — setidaknya satu unggahan akun hanya terbaca sebagian.</p>
-            <p><strong>TikTok tanpa views</strong> — views akun TikTok belum terbaca. Instagram tidak menampilkan views, jadi tidak dihitung.</p>
-            <p><strong>Tanpa handle</strong> — tautan tidak memuat handle, jadi ditampilkan sebagai URL.</p>
-            <p><strong>Belum diproses</strong> — belum ada satu pun snapshot untuk akun itu.</p>
-            <p><strong>Rumus ER</strong> — Instagram: (likes + komentar) ÷ followers; TikTok: (likes + komentar + share) ÷ views. Dipakai median, bukan rata-rata.</p>
+            <div class="popover-head">
+              <strong>Panduan Diagnostik & Rumus</strong>
+              <button type="button" class="popover-close" id="qualityInfoClose" aria-label="Tutup info">×</button>
+            </div>
+            <div class="popover-body">
+              <p><strong>Tanpa followers</strong> — akun yang followers-nya belum pernah terukur; ER Instagram butuh angka ini.</p>
+              <p><strong>Sebagian terbaca</strong> — setidaknya satu unggahan akun hanya terbaca sebagian.</p>
+              <p><strong>TikTok tanpa views</strong> — views akun TikTok belum terbaca. Instagram tidak menampilkan views, jadi tidak dihitung.</p>
+              <p><strong>Tanpa handle</strong> — tautan tidak memuat handle, jadi ditampilkan sebagai URL.</p>
+              <p><strong>Belum diproses</strong> — belum ada satu pun snapshot untuk akun itu.</p>
+              <p><strong>Rumus ER</strong> — Instagram: (likes + komentar) ÷ followers; TikTok: (likes + komentar + share) ÷ views. Dipakai median, bukan rata-rata.</p>
+            </div>
           </div>
         </section>
 
